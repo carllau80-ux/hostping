@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HostPing — 主机巡检与分析</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 侧边栏 -->
+  <aside id="sidebar">
+    <div class="logo">
+      <img class="logo-img" src="app-icon.png" alt="">
+      <div>
+        <div class="logo-title">HostPing <span id="verBadge" class="ver-badge"></span></div>
+        <div class="logo-sub" data-i18n="app.sub">主机巡检与分析</div>
+      </div>
+    </div>
+    <div class="mode-switch">
+      <button class="mode-btn" id="modeHost" data-i18n="mode.host">🖥 主机</button>
+      <button class="mode-btn active" id="modeDb" data-i18n="mode.db">🗄 数据库</button>
+    </div>
+    <div class="side-actions">
+      <button class="btn primary" id="btnAdd" data-i18n="side.add">＋ 新建连接</button>
+      <button class="btn primary" id="btnAddHost" data-i18n="side.addHost" style="display:none">＋ 新建主机</button>
+    </div>
+    <div id="connList" class="conn-list"></div>
+    <div id="hostList" class="conn-list" style="display:none"></div>
+    <div class="side-nmap-wrap">
+      <button class="btn" id="btnNmapScan" style="width:100%"><span data-i18n="nmap.title">🔎 端口扫描</span></button>
+      <button class="btn" id="btnIperf" style="width:100%;margin-top:6px"><span data-i18n="spd.title">🚀 测速</span></button>
+    </div>
+    <div class="side-foot">
+      <button class="mini" id="btnAdvanced" title="SQL Console">⌨</button>
+      <button class="mini" id="btnLang" title="Language">🌐 EN</button>
+      <button class="mini" id="btnTheme" title="Theme">🌙</button>
+      <button class="mini" id="autoState" data-i18n="side.settingsLabel">设置</button>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <main id="main">
+    <div id="dashboard">
+      <div class="dash-head">
+        <h2 data-i18n="dash.title">总览仪表盘</h2>
+        <div class="dash-tools">
+          <button class="tool-btn" id="btnPingAll" data-i18n-title="side.pingAll" title="全部 Ping">📡</button>
+          <button class="tool-btn" id="btnSettings" data-i18n-title="side.settings" title="自动巡检">⚡</button>
+          <button class="tool-btn" id="btnExportAll" data-i18n-title="side.exportAll" title="汇总报告">📄</button>
+        </div>
+        <div class="stat-row" id="statRow"></div>
+      </div>
+      <div class="filters">
+        <input id="searchBox" data-i18n-ph="dash.searchPh" placeholder="🔍 搜索名称 / 主机…" />
+        <select id="filterType"><option value="">全部类型</option></select>
+        <select id="filterGroup"><option value="">全部分组</option></select>
+      </div>
+      <div id="cards" class="cards"></div>
+    </div>
+
+    <div id="detail" style="display:none">
+      <div class="detail-head">
+        <button class="btn back" id="btnBack" data-i18n="detail.back">← 返回</button>
+        <div class="detail-title">
+          <span id="dIcon" class="big-icon"></span>
+          <div>
+            <div id="dName" class="d-name"></div>
+            <div id="dMeta" class="d-meta dim"></div>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <span id="dStatus" class="status-badge"></span>
+          <button class="btn" id="btnPingOne" data-i18n="detail.ping">▶ Ping</button>
+          <button class="btn" id="btnAI" data-i18n="ai.analyze">🤖 AI 分析</button>
+          <button class="btn" id="btnEdit" data-i18n="detail.edit">✎ 编辑</button>
+          <button class="btn" id="btnRefresh" data-i18n="detail.refresh">⟳ 刷新</button>
+          <button class="btn" id="btnExport" data-i18n="detail.export">⇓ 导出报告</button>
+          <button class="btn danger" id="btnDelete" data-i18n="detail.del">✕ 删除</button>
+        </div>
+      </div>
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="overview" data-i18n="tab.overview">概览</div>
+        <div class="tab" data-tab="ai" data-i18n="ai.tab">🤖 AI 分析</div>
+        <div class="tab" data-tab="topology" data-i18n="tab.topology">拓扑图</div>
+        <div class="tab" data-tab="tablespage" data-i18n="tab.tablesFull">数据表</div>
+        <div class="tab" data-tab="tbs" data-i18n="tab.tbs">表空间/文件</div>
+        <div class="tab" data-tab="services" data-i18n="tab.services">集群/服务</div>
+        <div class="tab" data-tab="dbs" data-i18n="tab.dbs">库/模式</div>
+        <div class="tab adv-only" data-tab="sql" data-i18n="tab.sql" style="display:none">SQL 控制台</div>
+        <div class="tab" data-tab="history" data-i18n="tab.history">检查历史</div>
+      </div>
+      <div class="tab-body" id="tabBody"></div>
+    </div>
+    <div id="hostDash" style="display:none">
+      <div class="dash-head">
+        <h2 data-i18n="hostdash.title">主机巡检</h2>
+        <div class="stat-row" id="hostStatRow"></div>
+      </div>
+      <div id="hostCards" class="cards"></div>
+    </div>
+
+    <div id="hostDetail" style="display:none">
+      <div class="detail-head">
+        <button class="btn back" id="btnHostBack">← <span data-i18n="detail.backShort">返回</span></button>
+        <div class="detail-title">
+          <span class="big-icon">🖥</span>
+          <div>
+            <div id="hName" class="d-name"></div>
+            <div id="hMeta" class="d-meta dim"></div>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <span id="hStatus" class="status-badge"></span>
+          <button class="btn primary" id="btnInspect" data-i18n="host.inspect">🔍 执行巡检</button>
+          <button class="btn" id="btnHostAI" data-i18n="ai.analyze">🤖 AI 分析</button>
+          <button class="btn" id="btnHostExport" data-i18n="detail.export">⇓ 导出报告</button>
+          <button class="btn" id="btnHostEdit" data-i18n="detail.edit">✎ 编辑</button>
+          <button class="btn danger" id="btnHostDelete" data-i18n="detail.del">✕ 删除</button>
+        </div>
+      </div>
+      <div id="hostProg" class="dim" style="padding:4px 2px;font-size:12px"></div>
+      <div class="tabs" id="hostTabs">
+        <div class="tab active" data-htab="report" data-i18n="host.tabReport">巡检报告</div>
+        <div class="tab" data-htab="ai" data-i18n="ai.tab">🤖 AI 分析</div>
+        <div class="tab" data-htab="hist" data-i18n="host.tabHist">历史</div>
+      </div>
+      <div class="tab-body" id="hostBody" style="min-height:420px"></div>
+    </div>
+  </main>
+</div>
+
+<!-- 连接编辑对话框 -->
+<dialog id="dlgConn">
+  <form id="formConn" method="dialog">
+    <h3 id="dlgConnTitle" data-i18n="dlg.newTitle">新建连接</h3>
+    <div class="ctabs" id="connTabs" style="display:none">
+      <div class="ctab active" data-ctab="basic" data-i18n="dlg.tabBasic">基本连接</div>
+      <div class="ctab" data-ctab="cert" data-i18n="dlg.tabCert">TLS 证书</div>
+    </div>
+    <div id="connTabBasic">
+    <div class="grid2">
+      <div class="lb-stack"><span data-i18n="dlg.type">数据库类型</span>
+        <input type="hidden" id="fType" />
+        <div class="combo" id="typeCombo">
+          <button type="button" class="combo-btn" id="fTypeBtn">
+            <span id="fTypeIcon" class="ci-icon">🐬</span>
+            <span id="fTypeName">MySQL</span>
+            <span class="combo-caret">▾</span>
+          </button>
+          <div class="combo-panel" id="fTypePanel" style="display:none">
+            <input id="fTypeSearch" data-i18n-ph="dlg.searchType" placeholder="🔍 搜索数据库…" />
+            <div class="combo-list" id="fTypeList"></div>
+          </div>
+        </div>
+      </div>
+      <label class="lb-stack"><span data-i18n="dlg.name">显示名称</span>
+        <input id="fName" data-i18n-ph="dlg.namePh" placeholder="如：生产-订单库" />
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.group">分组</span>
+        <input id="fGroup" data-i18n-ph="dlg.groupPh" placeholder="如：生产环境" list="groupList" />
+        <datalist id="groupList"></datalist>
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.timeout">超时（秒）</span>
+        <input id="fTimeout" type="number" min="1" max="60" value="5" />
+      </label>
+      <div class="host-port-row wide">
+        <div id="sqliteBtns" style="display:none">
+          <button type="button" class="btn small" id="btnPickOpen" data-i18n="dlg.pick">📂 打开文件</button>
+          <button type="button" class="btn small" id="btnPickCreate" data-i18n="dlg.create">🆕 新建文件</button>
+        </div>
+        <label class="lb-stack grow"><span id="hostLabelText" data-i18n="dlg.host">主机</span>
+          <input id="fHost" data-i18n-ph="dlg.hostPh" placeholder="IP 或主机名" required />
+        </label>
+        <label class="lb-stack port" id="portWrap"><span data-i18n="dlg.port">端口</span>
+          <input id="fPort" type="number" min="1" max="65535" />
+        </label>
+      </div>
+      <label id="lbDatabase" class="lb-stack wide"><span id="dbLabelText" data-i18n="dlg.database">数据库</span>
+        <input id="fDatabase" />
+      </label>
+      <label id="lbUser" class="lb-stack"><span id="userLabelText" data-i18n="dlg.user">用户名</span>
+        <input id="fUser" autocomplete="off" />
+      </label>
+      <label id="lbRole" class="lb-stack" style="display:none"><span data-i18n="dlg.role">连接身份</span>
+        <select id="fRole">
+          <option value="normal" data-i18n="dlg.roleNormal">普通用户</option>
+          <option value="sysdba">SYSDBA</option>
+          <option value="sysoper">SYSOPER</option>
+        </select>
+      </label>
+      <label class="lb-stack" id="lbPass"><span data-i18n="dlg.pass">密码</span>
+        <input id="fPassword" type="password" autocomplete="new-password" data-i18n-ph="dlg.passKeep" placeholder="留空保持原密码" />
+      </label>
+    </div>
+    <div id="typeHint" class="hint dim"></div>
+    </div>
+    <div id="connTabCert" style="display:none">
+      <div class="grid2">
+        <label class="lb-stack"><span data-i18n="cert.mode">TLS 模式</span>
+          <select id="certMode"></select>
+        </label>
+        <label class="lb-stack" id="lbCertSkip" style="display:none"><span data-i18n="cert.skip">跳过证书校验</span>
+          <select id="certSkip"><option value="" data-i18n="no">否</option><option value="true" data-i18n="yes">是</option></select>
+        </label>
+        <label class="lb-stack wide" id="lbCertCA"><span id="certCALabel" data-i18n="cert.ca">CA 证书</span>
+          <div class="file-row"><input id="certCA" placeholder="C:\certs\ca.pem" /><button type="button" class="btn small" id="btnPickCA" title="选择文件">📂</button></div>
+        </label>
+        <label class="lb-stack" id="lbCertFile"><span data-i18n="cert.client">客户端证书</span>
+          <div class="file-row"><input id="certFile" placeholder="C:\certs\client.crt" /><button type="button" class="btn small" id="btnPickCert" title="选择文件">📂</button></div>
+        </label>
+        <label class="lb-stack" id="lbCertKey"><span data-i18n="cert.key">私钥</span>
+          <div class="file-row"><input id="certKey" placeholder="C:\certs\client.key" /><button type="button" class="btn small" id="btnPickKey" title="选择文件">📂</button></div>
+        </label>
+        <label class="lb-stack" id="lbCertKeyPass" style="display:none"><span data-i18n="cert.keypass">私钥密码</span>
+          <input id="certKeyPass" type="password" autocomplete="new-password" />
+        </label>
+        <label class="lb-stack" id="lbCertSNI" style="display:none"><span data-i18n="cert.sni">服务器名称</span>
+          <input id="certSNI" />
+        </label>
+      </div>
+      <div class="hint dim" id="certHint"></div>
+    </div>
+    <div class="dlg-foot">
+      <div class="dlg-foot-left">
+        <button class="btn" type="button" id="btnTest" data-i18n="dlg.test">🔌 测试连接</button>
+        <span id="testResult"></span>
+      </div>
+      <div class="dlg-foot-right">
+        <button class="btn primary" type="button" id="btnSaveConn" data-i18n="dlg.save">保存</button>
+        <button class="btn" type="button" id="btnCancelConn" data-i18n="dlg.cancel">取消</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<!-- 设置对话框 -->
+<dialog id="dlgSettings">
+  <form method="dialog">
+    <h3 data-i18n="set.title">自动巡检设置</h3>
+    <label class="chk"><input type="checkbox" id="sAuto" /> <span data-i18n="set.enable">启用定时自动巡检</span></label>
+    <label><span data-i18n="set.interval">巡检间隔（秒）</span><input id="sInterval" type="number" min="10" max="86400" value="60" /></label>
+    <label><span data-i18n="set.timeout">单次检查超时（秒）</span><input id="sTimeout" type="number" min="1" max="60" value="5" /></label>
+    <hr style="border:none;border-top:1px solid var(--line);margin:14px 0 10px" />
+    <h3 style="font-size:14px;color:var(--brand);margin:0 0 8px" data-i18n="ai.cfgTitle">🤖 AI 分析设置</h3>
+    <div class="grid2">
+      <label class="lb-stack"><span data-i18n="ai.provider">提供商</span>
+        <input type="hidden" id="aiProvider" />
+        <div class="combo" id="aiCombo">
+          <button type="button" class="combo-btn" id="aiComboBtn">
+            <span id="aiProvIcon" class="ci-icon">🧠</span>
+            <span id="aiProvName">智谱 GLM</span>
+            <span class="combo-caret">▾</span>
+          </button>
+          <div class="combo-panel" id="aiComboPanel" style="display:none">
+            <div class="combo-list" id="aiComboList"></div>
+          </div>
+        </div>
+      </label>
+      <label class="lb-stack"><span data-i18n="ai.model">模型名</span>
+        <input id="aiModel" placeholder="glm-4-flash" />
+      </label>
+      <label class="lb-stack wide" id="aiLbBase" style="display:none"><span data-i18n="ai.baseUrl">API Base URL</span>
+        <input id="aiBase" placeholder="https://your-host/v1" />
+      </label>
+      <label class="lb-stack wide"><span data-i18n="ai.key">API Key</span>
+        <input id="aiKey" type="password" autocomplete="new-password" data-i18n-ph="ai.keyKeep" placeholder="留空保持原 Key" />
+      </label>
+    </div>
+    <div class="hint dim" data-i18n="ai.hint"></div>
+    <div class="hint dim" id="cfgDir"></div>
+    <div class="dlg-foot">
+      <div>
+        <button class="btn primary" type="button" id="btnSaveSettings" data-i18n="set.save">保存</button>
+        <button class="btn" type="button" id="btnSettingsCancel" data-i18n="dlg.cancel">取消</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<!-- 错误详情对话框 -->
+<dialog id="dlgError">
+  <div class="err-wrap">
+    <div class="err-head"><span class="err-ico">⛔</span><span id="errTitle"></span></div>
+    <div class="err-meta dim" id="errMeta"></div>
+    <div class="err-body">
+      <div class="err-kind-line"><span class="err-chip" id="errKind"></span></div>
+      <div id="errList" class="err-list"></div>
+      <div class="err-sec" data-i18n="err.detail">原始错误</div>
+      <pre id="errMsg" class="err-pre"></pre>
+      <div class="err-sec" data-i18n="err.sugT">排查建议</div>
+      <div id="errSug" class="err-sug"></div>
+    </div>
+    <div class="dlg-foot">
+      <span></span>
+      <div>
+        <button class="btn" type="button" id="btnErrCopy" data-i18n="err.copy">复制详情</button>
+        <button class="btn primary" type="button" id="btnErrClose" data-i18n="err.close">关闭</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- 全部 Ping 过程对话框 -->
+<dialog id="dlgPing">
+  <div class="err-wrap">
+    <div class="err-head" style="border-bottom:1px solid var(--line)">
+      <span class="err-ico" style="color:var(--brand)">📡</span>
+      <span data-i18n="pingdlg.title">全部 Ping</span>
+      <span id="pingProg" class="dim" style="font-size:12px;margin-left:auto"></span>
+    </div>
+    <div id="pingRows" class="ping-rows"></div>
+    <div class="dlg-foot">
+      <span id="pingDone" class="dim" style="font-size:12px"></span>
+      <div>
+        <button class="btn primary" type="button" id="btnPingDlgClose" data-i18n="dlg.close">关闭</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- 主机编辑对话框 -->
+<dialog id="dlgHost">
+  <form id="formHost" method="dialog">
+    <h3 id="dlgHostTitle" data-i18n="host.newTitle">新建主机</h3>
+    <div class="grid2">
+      <label class="lb-stack"><span data-i18n="dlg.name">显示名称</span>
+        <input id="hFName" data-i18n-ph="dlg.namePh" placeholder="如：生产-应用服务器" />
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.group">分组</span>
+        <input id="hFGroup" data-i18n-ph="dlg.groupPh" placeholder="如：生产环境" />
+      </label>
+      <div class="host-port-row wide">
+        <label class="lb-stack grow"><span data-i18n="dlg.host">主机</span>
+          <input id="hFHost" data-i18n-ph="dlg.hostPh" placeholder="IP 或主机名" required />
+        </label>
+        <label class="lb-stack port"><span data-i18n="dlg.port">端口</span>
+          <input id="hFPort" type="number" min="1" max="65535" value="22" />
+        </label>
+      </div>
+      <label class="lb-stack"><span data-i18n="host.user">SSH 用户</span>
+        <input id="hFUser" placeholder="root" />
+      </label>
+      <label class="lb-stack"><span data-i18n="host.authType">认证方式</span>
+        <select id="hFAuth">
+          <option value="password" data-i18n="host.authPwd">密码</option>
+          <option value="key" data-i18n="host.authKey">私钥</option>
+        </select>
+      </label>
+      <label class="lb-stack" id="hLbPwd"><span data-i18n="dlg.pass">密码</span>
+        <input id="hFPassword" type="password" autocomplete="new-password" data-i18n-ph="dlg.passKeep" placeholder="留空保持原密码" />
+      </label>
+      <label class="lb-stack wide" id="hLbKeyPath" style="display:none"><span data-i18n="host.keyPath">私钥文件</span>
+        <div class="file-row"><input id="hFKeyPath" placeholder="C:\Users\...\.ssh\id_rsa" /><button type="button" class="btn small" id="hBtnPickKey" title="选择文件">📂</button></div>
+      </label>
+      <label class="lb-stack wide" id="hLbKeyPass" style="display:none"><span data-i18n="cert.keypass">私钥口令</span>
+        <input id="hFKeyPass" type="password" autocomplete="new-password" placeholder="（如私钥已加密）" />
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.timeout">超时（秒）</span>
+        <input id="hFTimeout" type="number" min="1" max="120" value="15" />
+      </label>
+    </div>
+    <div class="hint dim" data-i18n="host.hint"></div>
+    <div class="dlg-foot">
+      <div class="dlg-foot-left">
+        <button class="btn" type="button" id="hBtnTest" data-i18n="host.testConn">🔌 测试连接</button>
+        <span id="hostTestResult"></span>
+      </div>
+      <div class="dlg-foot-right">
+        <button class="btn primary" type="button" id="hBtnSave" data-i18n="dlg.save">保存</button>
+        <button class="btn" type="button" id="hBtnCancel" data-i18n="dlg.cancel">取消</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<!-- 类 nmap 端口扫描对话框 -->
+<dialog id="dlgNmap">
+  <form id="formNmap" method="dialog" onsubmit="return false">
+    <h3 data-i18n="nmap.newTitle">端口扫描（类 nmap）</h3>
+    <div class="grid2">
+      <label class="lb-stack wide"><span data-i18n="nmap.target">目标主机</span>
+        <input id="nmapTarget" data-i18n-ph="nmap.targetPh" placeholder="IP 或主机名，如 192.168.1.10" />
+      </label>
+      <label class="lb-stack wide"><span data-i18n="nmap.portSpec">端口范围</span>
+        <input id="nmapPortSpec" data-i18n-ph="nmap.portSpecPh" placeholder="如 22,80,443 或 1-1024" />
+      </label>
+    </div>
+    <div class="hint dim" data-i18n="nmap.hint">从本机直接发起 TCP 连接探测，无需登录目标主机；最多 2000 个端口</div>
+    <div class="dlg-foot">
+      <div class="dlg-foot-left"><span id="nmapSummary" class="dim" style="font-size:12px"></span></div>
+      <div class="dlg-foot-right">
+        <button class="btn primary" type="button" id="nmapBtnGo" data-i18n="nmap.scanBtn">开始扫描</button>
+        <button class="btn" type="button" id="nmapBtnClose" data-i18n="dlg.cancel">取消</button>
+      </div>
+    </div>
+    <div id="nmapResult" style="margin-top:10px;max-height:320px;overflow:auto"></div>
+    <div id="nmapHistory" style="margin-top:8px"></div>
+  </form>
+</dialog>
+
+<!-- AI 分析进度对话框 -->
+<dialog id="dlgAIProgress">
+  <div style="padding:24px 28px;min-width:440px">
+    <h3 style="margin:0 0 16px;font-size:15px">🤖 <span data-i18n="ai.analyzing">AI 分析中…</span></h3>
+    <div class="pbar-row"><div class="pbar"><div class="pbar-fill indet" id="aiPFill"></div></div></div>
+    <div class="dim" style="font-size:12px;margin-top:10px">
+      <span data-i18n="ai.elapsed">已用时</span> <b id="aiElapsed">0s</b> · <span data-i18n="ai.pleaseWait">大模型生成需要一些时间，请稍候…</span>
+    </div>
+  </div>
+</dialog>
+
+<!-- 测速对话框（纯 Go iperf3 客户端） -->
+<dialog id="dlgIperf">
+  <form method="dialog" onsubmit="return false">
+    <h3 data-i18n="spd.newTitle">测速（iperf3）</h3>
+    <div class="grid2">
+      <label class="lb-stack"><span data-i18n="spd.server">测速服务器</span>
+        <input id="ipServer" placeholder="192.168.1.10" />
+      </label>
+      <label class="lb-stack"><span data-i18n="spd.port">服务端口</span>
+        <input id="ipPort" type="number" min="1" max="65535" value="5201" />
+      </label>
+      <label class="lb-stack"><span data-i18n="spd.duration">测试时长（秒）</span>
+        <input id="ipDuration" type="number" min="1" max="300" value="10" />
+      </label>
+      <label class="lb-stack"><span data-i18n="spd.parallel">并行流数</span>
+        <input id="ipParallel" type="number" min="1" max="16" value="1" />
+      </label>
+      <label class="lb-stack"><span data-i18n="spd.dir">测试方向</span>
+        <select id="ipDir">
+          <option value="up" data-i18n="spd.up">上行（本机 → 服务端）</option>
+          <option value="down" data-i18n="spd.down">下行（服务端 → 本机）</option>
+        </select>
+      </label>
+    </div>
+    <div class="hint dim" data-i18n="spd.hint">在目标服务器运行 iperf3 -s 后即可测速；纯 Go 客户端实现，无需本机安装 iperf3</div>
+    <div class="dlg-foot">
+      <div class="dlg-foot-left"><span id="ipStatus" class="dim" style="font-size:12px"></span></div>
+      <div class="dlg-foot-right">
+        <button class="btn primary" type="button" id="ipBtnGo" data-i18n="spd.start">开始测速</button>
+        <button class="btn" type="button" id="ipBtnClose" data-i18n="dlg.cancel">取消</button>
+      </div>
+    </div>
+    <div id="ipResult" style="margin-top:10px;max-height:340px;overflow:auto"></div>
+    <div id="ipHistory" style="margin-top:8px"></div>
+  </form>
+</dialog>
+
+<div id="toasts"></div>
+
+<script src="echarts.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
