@@ -29,9 +29,11 @@ type Store struct {
 	Settings     model.Settings
 	Conns        []model.Conn
 	Hosts        []model.SSHHost
+	BMCHosts     []model.BMCHost                     // BMC 带外连接（IPMI）
 	NmapHistory  []model.NmapHistoryItem             // 类 nmap 扫描记录（最新在前，最多 50 条）
 	SpeedHistory []model.SpeedEntry                  // 测速记录（最新在前，最多 50 条）
 	HostHistory  map[string][]model.HostHistoryEntry // 主机巡检历史（hostID → 最新在前，每台最多 10 条）
+	BMCHistory   map[string][]model.BMCHistoryEntry  // BMC 巡检历史（bmcID → 最新在前，每台最多 10 条）
 	DBAIHistory  []model.DBAIEntry                   // 数据库 AI 分析历史（最新在前，最多 20 条）
 	aiKeyEnc     string                              // AI API Key（密文，存 passwords["ai-key"]）
 	deleted      map[string]bool                     // 已删除连接 ID（墓碑）：Save 合并磁盘数据时跳过，防止删除的连接"复活"
@@ -78,9 +80,11 @@ func Load() (*Store, error) {
 		Settings     model.Settings                      `json:"settings"`
 		Conns        []model.Conn                        `json:"conns"`
 		Hosts        []model.SSHHost                     `json:"hosts"`
+		BMCHosts     []model.BMCHost                     `json:"bmcs"`
 		NmapHistory  []model.NmapHistoryItem             `json:"nmapHistory"`
 		SpeedHistory []model.SpeedEntry                  `json:"speedHistory"`
 		HostHistory  map[string][]model.HostHistoryEntry `json:"hostHistory"`
+		BMCHistory   map[string][]model.BMCHistoryEntry  `json:"bmcHistory"`
 		DBAIHistory  []model.DBAIEntry                   `json:"dbAiHistory"`
 		Passwords    map[string]string                   `json:"passwords"` // connID -> 加密串（含主机 h-/hk- 前缀键）
 		Deleted      []string                            `json:"deleted"`   // 已删除连接 ID（墓碑）
@@ -95,9 +99,11 @@ func Load() (*Store, error) {
 					Settings     model.Settings                      `json:"settings"`
 					Conns        []model.Conn                        `json:"conns"`
 					Hosts        []model.SSHHost                     `json:"hosts"`
+					BMCHosts     []model.BMCHost                     `json:"bmcs"`
 					NmapHistory  []model.NmapHistoryItem             `json:"nmapHistory"`
 					SpeedHistory []model.SpeedEntry                  `json:"speedHistory"`
 					HostHistory  map[string][]model.HostHistoryEntry `json:"hostHistory"`
+					BMCHistory   map[string][]model.BMCHistoryEntry  `json:"bmcHistory"`
 					DBAIHistory  []model.DBAIEntry                   `json:"dbAiHistory"`
 					Passwords    map[string]string                   `json:"passwords"`
 					Deleted      []string                            `json:"deleted"`
@@ -145,7 +151,19 @@ func Load() (*Store, error) {
 			s.Hosts[i].KeyPassphrase = s.Decrypt(enc)
 		}
 	}
-	log.Printf("[config] 加载完成: %d 个连接, %d 个主机", len(s.Conns), len(s.Hosts))
+	// BMC 连接（密码键 b-<bmcID>）
+	s.BMCHosts = raw.BMCHosts
+	for i := range s.BMCHosts {
+		if enc, ok := raw.Passwords["b-"+s.BMCHosts[i].ID]; ok {
+			s.BMCHosts[i].Password = s.Decrypt(enc)
+		}
+	}
+	if raw.BMCHistory != nil {
+		s.BMCHistory = raw.BMCHistory
+	} else {
+		s.BMCHistory = map[string][]model.BMCHistoryEntry{}
+	}
+	log.Printf("[config] 加载完成: %d 个连接, %d 个主机, %d 个 BMC", len(s.Conns), len(s.Hosts), len(s.BMCHosts))
 	return s, nil
 }
 
@@ -210,6 +228,15 @@ func (s *Store) Save() error {
 		}
 	}
 
+	// BMC 连接密码（键 b-<bmcID>，命名空间隔离）
+	for _, b := range s.BMCHosts {
+		if b.Password != "" {
+			passwords["b-"+b.ID] = s.Encrypt(b.Password)
+		} else if pw, ok := diskPasswords["b-"+b.ID]; ok {
+			passwords["b-"+b.ID] = pw
+		}
+	}
+
 	// 3) 磁盘上有、内存中没有、且未被删除的连接 → 原样保留（含密文）
 	for id, dc := range diskConns {
 		if !inMem[id] && !s.deleted[id] {
@@ -242,13 +269,15 @@ func (s *Store) Save() error {
 		Settings     model.Settings                      `json:"settings"`
 		Conns        []model.Conn                        `json:"conns"`
 		Hosts        []model.SSHHost                     `json:"hosts"`
+		BMCHosts     []model.BMCHost                     `json:"bmcs,omitempty"`
 		NmapHistory  []model.NmapHistoryItem             `json:"nmapHistory,omitempty"`
 		SpeedHistory []model.SpeedEntry                  `json:"speedHistory,omitempty"`
 		HostHistory  map[string][]model.HostHistoryEntry `json:"hostHistory,omitempty"`
+		BMCHistory   map[string][]model.BMCHistoryEntry  `json:"bmcHistory,omitempty"`
 		DBAIHistory  []model.DBAIEntry                   `json:"dbAiHistory,omitempty"`
 		Passwords    map[string]string                   `json:"passwords"`
 		Deleted      []string                            `json:"deleted,omitempty"`
-	}{Version: 1, Settings: s.Settings, Conns: conns, Hosts: s.Hosts, NmapHistory: s.NmapHistory, SpeedHistory: s.SpeedHistory, HostHistory: s.HostHistory, DBAIHistory: s.DBAIHistory, Passwords: passwords, Deleted: keptDeleted}
+	}{Version: 1, Settings: s.Settings, Conns: conns, Hosts: s.Hosts, BMCHosts: s.BMCHosts, NmapHistory: s.NmapHistory, SpeedHistory: s.SpeedHistory, HostHistory: s.HostHistory, BMCHistory: s.BMCHistory, DBAIHistory: s.DBAIHistory, Passwords: passwords, Deleted: keptDeleted}
 	// 清理内存中的墓碑集合为落盘集合
 	s.deleted = map[string]bool{}
 	for _, id := range keptDeleted {
@@ -417,6 +446,99 @@ func (s *Store) DeleteHost(id string) bool {
 	return false
 }
 
+// ---------- BMC 连接 CRUD ----------
+
+// ListBMCs 返回全部 BMC 连接（脱敏）。
+func (s *Store) ListBMCs() []model.BMCHost {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]model.BMCHost, len(s.BMCHosts))
+	copy(out, s.BMCHosts)
+	for i := range out {
+		out[i] = out[i].Masked()
+	}
+	return out
+}
+
+// GetBMC 按 ID 查找 BMC 连接（含密码，Load/Upsert 时已解密入内存）。
+func (s *Store) GetBMC(id string) (model.BMCHost, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, b := range s.BMCHosts {
+		if b.ID == id {
+			return b, true
+		}
+	}
+	return model.BMCHost{}, false
+}
+
+// UpsertBMC 新增/更新 BMC 连接（密码留空表示保持不变）。
+func (s *Store) UpsertBMC(b model.BMCHost) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b.Name == "" {
+		b.Name = b.Host
+	}
+	if b.Timeout <= 0 {
+		b.Timeout = 10
+	}
+	if b.ID != "" {
+		delete(s.deleted, "b-"+b.ID)
+	}
+	for i := range s.BMCHosts {
+		if s.BMCHosts[i].ID == b.ID {
+			if b.Password == "" {
+				b.Password = s.BMCHosts[i].Password
+			}
+			s.BMCHosts[i] = b
+			return nil
+		}
+	}
+	if b.ID == "" {
+		b.ID = "b" + newID()
+	}
+	s.BMCHosts = append(s.BMCHosts, b)
+	return nil
+}
+
+// DeleteBMC 删除 BMC 连接（记录墓碑防复活）。
+func (s *Store) DeleteBMC(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.BMCHosts {
+		if s.BMCHosts[i].ID == id {
+			s.BMCHosts = append(s.BMCHosts[:i], s.BMCHosts[i+1:]...)
+			s.deleted["b-"+id] = true
+			return true
+		}
+	}
+	return false
+}
+
+// AddBMCHistory 追加 BMC 巡检历史（最新在前，每台最多 10 条）。调用方随后 Save。
+func (s *Store) AddBMCHistory(bmcID string, r model.BMCReport) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.BMCHistory == nil {
+		s.BMCHistory = map[string][]model.BMCHistoryEntry{}
+	}
+	list := s.BMCHistory[bmcID]
+	list = append([]model.BMCHistoryEntry{{Time: time.Now().UnixMilli(), Report: r}}, list...)
+	if len(list) > 10 {
+		list = list[:10]
+	}
+	s.BMCHistory[bmcID] = list
+}
+
+// GetBMCHistory 返回 BMC 巡检历史（最新在前）。
+func (s *Store) GetBMCHistory(bmcID string) []model.BMCHistoryEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]model.BMCHistoryEntry, len(s.BMCHistory[bmcID]))
+	copy(out, s.BMCHistory[bmcID])
+	return out
+}
+
 // SaveSettings 更新设置。
 func (s *Store) SaveSettings(st model.Settings) {
 	s.mu.Lock()
@@ -559,6 +681,29 @@ func (s *Store) AttachHostAI(hostID string, r model.HostReport, ai model.AIAnaly
 		list = list[:10]
 	}
 	s.HostHistory[hostID] = list
+}
+
+// AttachBMCAI 将 AI 分析挂到匹配 CollectedAt 的 BMC 巡检历史；无匹配则新增条目。
+func (s *Store) AttachBMCAI(bmcID string, r model.BMCReport, ai model.AIAnalysis) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.BMCHistory == nil {
+		s.BMCHistory = map[string][]model.BMCHistoryEntry{}
+	}
+	list := s.BMCHistory[bmcID]
+	for i := range list {
+		if list[i].Report.CollectedAt == r.CollectedAt {
+			list[i].AI = &ai
+			s.BMCHistory[bmcID] = list
+			return
+		}
+	}
+	entry := model.BMCHistoryEntry{Time: time.Now().UnixMilli(), Report: r, AI: &ai}
+	list = append([]model.BMCHistoryEntry{entry}, list...)
+	if len(list) > 10 {
+		list = list[:10]
+	}
+	s.BMCHistory[bmcID] = list
 }
 
 // GetHostHistory 返回主机巡检历史（最新在前）。

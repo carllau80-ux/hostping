@@ -137,6 +137,18 @@ const I18N = {
     "ai.done": "AI 分析完成", "ai.section": "AI 分析报告", "ai.export": "⇓ 导出 HTML",
     "ai.tab": "🤖 AI 分析", "ai.history": "历史分析（点击回看）", "ai.elapsed": "已用时", "ai.pleaseWait": "大模型生成需要一些时间，请稍候…",
     "host.tabReport": "巡检报告", "host.tabHist": "历史", "host.backToList": "返回历史列表", "host.histEmpty": "暂无历史巡检记录",
+    // BMC 带外巡检
+    "mode.bmc": "🔌 BMC", "side.addBmc": "＋ 新建 BMC", "bmcdash.title": "BMC 带外巡检",
+    "bmc.newTitle": "新建 BMC 连接", "bmc.editTitle": "编辑 BMC 连接", "bmc.addr": "BMC 地址", "bmc.addrPh": "BMC 管理 IP",
+    "bmc.user": "BMC 用户名", "bmc.hint": "通过 IPMI 2.0（RMCP+，UDP 623）带外采集，无需登录操作系统；巡检为只读操作（仅查询设备/传感器/SEL/FRU）",
+    "bmc.empty": "还没有 BMC 连接", "bmc.emptyHint": "点击「＋ 新建 BMC」添加服务器带外管理口",
+    "bmc.statTotal": "BMC 总数", "bmc.statPending": "未巡检", "bmc.statOk": "巡检正常",
+    "bmc.lastInspect": "上次巡检", "bmc.inspecting": "带外巡检中", "bmc.inspectDone": "BMC 巡检完成",
+    "bmc.step.connect": "建立 RMCP+ 会话", "bmc.step.device": "BMC 设备信息", "bmc.step.chassis": "机箱状态",
+    "bmc.step.sensors": "传感器读数", "bmc.step.fru": "FRU 硬件清单", "bmc.step.sel": "SEL 事件日志", "bmc.step.hw": "硬件配置",
+    "bmc.secDevice": "BMC 设备", "bmc.secChassis": "机箱状态", "bmc.secSensors": "传感器读数", "bmc.secFru": "FRU 硬件清单", "bmc.secSel": "SEL 系统事件日志", "bmc.secHw": "硬件配置",
+    "bmc.health": "总体健康", "bmc.testOk": "BMC 连接成功", "bmc.noSel": "未采集到 SEL 日志",
+    "bmc.selRange": "日志范围", "bmc.selAll": "全部", "bmc.selFiltered": "筛选后", "bmc.selFetched": "已拉取", "bmc.selTotal": "BMC 总计", "bmc.selDay": "天",
     "side.settingsLabel": "设置",
     "spd.title": "🚀 测速", "spd.newTitle": "测速（iperf3）", "spd.server": "测速服务器", "spd.port": "服务端口",
     "spd.duration": "测试时长（秒）", "spd.parallel": "并行流数", "spd.dir": "测试方向",
@@ -282,6 +294,17 @@ const I18N = {
     "ai.done": "AI analysis done", "ai.section": "AI Analysis Report", "ai.export": "⇓ Export HTML",
     "ai.tab": "🤖 AI Analysis", "ai.history": "History (click to review)", "ai.elapsed": "Elapsed", "ai.pleaseWait": "LLM generation takes a while, please wait…",
     "host.tabReport": "Inspection Report", "host.tabHist": "History", "host.backToList": "Back to history list", "host.histEmpty": "No inspection history yet",
+    "mode.bmc": "🔌 BMC", "side.addBmc": "＋ New BMC", "bmcdash.title": "BMC Out-of-Band Inspection",
+    "bmc.newTitle": "New BMC Connection", "bmc.editTitle": "Edit BMC Connection", "bmc.addr": "BMC Address", "bmc.addrPh": "BMC management IP",
+    "bmc.user": "BMC Username", "bmc.hint": "Out-of-band collection via IPMI 2.0 (RMCP+, UDP 623); no OS login required; read-only queries (device/sensors/SEL/FRU)",
+    "bmc.empty": "No BMC connections yet", "bmc.emptyHint": "Click ＋ New BMC to add a server management port",
+    "bmc.statTotal": "BMCs", "bmc.statPending": "Pending", "bmc.statOk": "OK",
+    "bmc.lastInspect": "Last inspect", "bmc.inspecting": "Inspecting", "bmc.inspectDone": "BMC inspection done",
+    "bmc.step.connect": "RMCP+ session", "bmc.step.device": "BMC device info", "bmc.step.chassis": "Chassis status",
+    "bmc.step.sensors": "Sensor readings", "bmc.step.fru": "FRU inventory", "bmc.step.sel": "SEL event log", "bmc.step.hw": "Hardware config",
+    "bmc.secDevice": "BMC Device", "bmc.secChassis": "Chassis Status", "bmc.secSensors": "Sensor Readings", "bmc.secFru": "FRU Inventory", "bmc.secSel": "SEL Event Log", "bmc.secHw": "Hardware Config",
+    "bmc.health": "Overall Health", "bmc.testOk": "BMC connected", "bmc.noSel": "No SEL log collected",
+    "bmc.selRange": "Log range", "bmc.selAll": "All", "bmc.selFiltered": "Filtered", "bmc.selFetched": "Fetched", "bmc.selTotal": "BMC total", "bmc.selDay": "days",
     "side.settingsLabel": "Settings",
     "spd.title": "🚀 Speed Test", "spd.newTitle": "Speed Test (iperf3)", "spd.server": "Server", "spd.port": "Port",
     "spd.duration": "Duration (s)", "spd.parallel": "Parallel streams", "spd.dir": "Direction",
@@ -341,6 +364,9 @@ const S = {
   mode: "db", hosts: [], hostSel: null, hostReports: {}, hostBusy: false, hostDeleteArmed: null,
   aiReports: {}, dbAIReports: {}, aiBusy: false,
   hostView: "report", hostHistIdx: -1, hostHistory: [],
+  // BMC 带外巡检模式
+  bmcs: [], bmcSel: null, bmcReports: {}, bmcBusy: false, bmcDeleteArmed: null,
+  bmcAIReports: {}, bmcView: "report", bmcHistIdx: -1, bmcHistory: [], bmcSelFilter: {},
   iperfBusy: false,
 };
 
@@ -396,6 +422,7 @@ async function reload() {
   S.types = (await A.GetTypes()) || [];
   S.conns = (await A.GetConnections()) || [];
   S.hosts = (await A.GetSSHHosts()) || [];
+  S.bmcs = (await A.GetBMCs()) || [];
   S.latest = (await A.GetLatestResults()) || {};
   S.settings = (await A.GetSettings()) || { autoPing: false, intervalSec: 60, pingTimeout: 5 };
   renderAll();
@@ -406,17 +433,23 @@ function switchMode(mode) {
   S.mode = mode;
   $("#modeDb").classList.toggle("active", mode === "db");
   $("#modeHost").classList.toggle("active", mode === "host");
+  $("#modeBmc").classList.toggle("active", mode === "bmc");
   $("#btnAdd").style.display = mode === "db" ? "" : "none";
   $("#btnAddHost").style.display = mode === "host" ? "" : "none";
+  $("#btnAddBmc").style.display = mode === "bmc" ? "" : "none";
   $("#connList").style.display = mode === "db" ? "" : "none";
   $("#hostList").style.display = mode === "host" ? "" : "none";
+  $("#bmcList").style.display = mode === "bmc" ? "" : "none";
   // 视图切换
   $("#dashboard").style.display = mode === "db" ? "" : "none";
   $("#hostDash").style.display = mode === "host" ? "" : "none";
+  $("#bmcDash").style.display = mode === "bmc" ? "" : "none";
   $("#detail").style.display = "none";
   $("#hostDetail").style.display = "none";
-  S.sel = null; S.hostSel = null;
+  $("#bmcDetail").style.display = "none";
+  S.sel = null; S.hostSel = null; S.bmcSel = null;
   if (mode === "host") { renderHostList(); renderHostDash(); }
+  if (mode === "bmc") { renderBMCList(); renderBMCDash(); }
   renderAutoState();
 }
 
@@ -852,6 +885,429 @@ async function exportHostReport(id) {
     const p = await A.ExportHostReport(id, r ? JSON.stringify(r) : "", ai ? ai.markdown : "");
     if (p) toast(t("toast.exportOk") + p, "ok");
   } catch (e) { if (String(e).indexOf("cancel") < 0) toast(t("toast.exportFail") + e, "err"); }
+}
+
+/* ---------------- BMC 带外巡检（IPMI） ---------------- */
+function bmcState(id) {
+  S.bmcReports[id] = S.bmcReports[id] || null;
+  return S.bmcReports[id];
+}
+
+function bmcLastStatus(id) {
+  const r = S.bmcReports[id];
+  if (!r) return "na";
+  if (r.health === "严重") return "err";
+  if (r.health === "警告") return "warn";
+  return "ok";
+}
+
+function renderBMCList() {
+  const list = $("#bmcList");
+  if (!S.bmcs.length) {
+    list.innerHTML = `<div class="empty" style="color:#7488ab;padding:30px 8px;font-size:12px">${t("bmc.empty")}<br>${t("bmc.emptyHint")}</div>`;
+    return;
+  }
+  list.innerHTML = S.bmcs.map((b) => `
+    <div class="conn-item ${S.bmcSel === b.id ? "active" : ""}" data-id="${esc(b.id)}">
+      <span class="dot ${bmcLastStatus(b.id)}"></span>
+      <span class="c-icon">🔌</span>
+      <div style="flex:1;min-width:0">
+        <div class="c-name">${esc(b.name)}</div>
+        <div class="c-host">${esc(b.host)}:${esc(b.port || 623)}</div>
+      </div>
+      <button class="item-edit" data-id="${esc(b.id)}" title="${esc(t("detail.edit"))}">✎</button>
+    </div>`).join("");
+  list.querySelectorAll(".conn-item").forEach((el) => {
+    el.onclick = () => showBMCDetail(el.dataset.id);
+    el.ondblclick = () => openBMCDialog(el.dataset.id);
+  });
+  list.querySelectorAll(".item-edit").forEach((el) => {
+    el.onclick = (e) => { e.stopPropagation(); openBMCDialog(el.dataset.id); };
+  });
+}
+
+function renderBMCDash() {
+  const cards = $("#bmcCards");
+  const stats = { total: S.bmcs.length, ok: 0, inspected: 0 };
+  for (const b of S.bmcs) if (S.bmcReports[b.id]) { stats.inspected++; if (bmcLastStatus(b.id) === "ok") stats.ok++; }
+  const statRow = $("#bmcStatRow");
+  if (statRow) statRow.innerHTML = `
+    <div class="stat"><b>${stats.total}</b><span>${t("bmc.statTotal")}</span></div>
+    <div class="stat na"><b>${stats.total - stats.inspected}</b><span>${t("bmc.statPending")}</span></div>
+    <div class="stat ok"><b>${stats.ok}</b><span>${t("bmc.statOk")}</span></div>`;
+  if (!S.bmcs.length) {
+    cards.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🔌</div>${t("bmc.empty")}<br><span class="dim" style="font-size:12px">${t("bmc.emptyHint")}</span></div>`;
+    return;
+  }
+  cards.innerHTML = S.bmcs.map((b) => {
+    const r = S.bmcReports[b.id];
+    const last = r ? new Date(r.collectedAt).toLocaleString() : "—";
+    const health = r ? r.health : "";
+    return `<div class="host-card" data-id="${esc(b.id)}">
+      <div class="top"><span>🔌</span><span class="h-name">${esc(b.name)}</span><span class="h-type">${esc(b.group || "")}</span></div>
+      <div class="host">${esc(b.host)}:${esc(b.port || 623)}</div>
+      <div class="h-meta"><span class="h-last">${t("bmc.lastInspect")}: ${esc(last)}</span>${health ? ` · <span class="${health === "严重" ? "err" : health === "警告" ? "warn" : "ok"}">${esc(health)}</span>` : ""}</div>
+      <div class="host-actions">
+        <button class="btn small h-binspect" data-id="${esc(b.id)}">${t("host.inspect")}</button>
+        <button class="btn small h-bexport" data-id="${esc(b.id)}">${t("detail.export")}</button>
+        <button class="btn small h-bedit" data-id="${esc(b.id)}">${t("detail.edit")}</button>
+      </div>
+    </div>`;
+  }).join("");
+  cards.querySelectorAll(".host-card").forEach((el) => { el.onclick = () => showBMCDetail(el.dataset.id); });
+  cards.querySelectorAll(".h-binspect").forEach((el) => { el.onclick = (e) => { e.stopPropagation(); inspectBMC(el.dataset.id); }; });
+  cards.querySelectorAll(".h-bexport").forEach((el) => { el.onclick = (e) => { e.stopPropagation(); exportBMCReport(el.dataset.id); }; });
+  cards.querySelectorAll(".h-bedit").forEach((el) => { el.onclick = (e) => { e.stopPropagation(); openBMCDialog(el.dataset.id); }; });
+}
+
+async function showBMCDetail(id) {
+  S.bmcSel = id;
+  const b = S.bmcs.find((x) => x.id === id); if (!b) return;
+  $("#bmcDash").style.display = "none";
+  $("#bmcDetail").style.display = "block";
+  $("#bName").textContent = b.name;
+  $("#bMeta").textContent = `${b.host}:${b.port || 623} · ${b.user || "—"}`;
+  const st = bmcLastStatus(id);
+  $("#bStatus").textContent = "● " + (st === "ok" ? t("st.ok") : st === "warn" ? t("host.badgeWarn") : st === "err" ? t("st.err") : t("st.na"));
+  $("#bStatus").className = "status-badge " + st;
+  S.bmcView = "report"; S.bmcHistIdx = -1;
+  document.querySelectorAll("#bmcTabs .tab").forEach((x) => x.classList.toggle("active", (x.dataset.btab || "report") === "report"));
+  renderBMCView();
+  renderBMCList();
+  $("#dashboard").style.display = "none";
+  $("#bmcDash").style.display = "none";
+  try {
+    const A = API();
+    S.bmcHistory = (A && await A.GetBMCHistory(id)) || [];
+    if (S.bmcView === "hist") renderBMCView();
+  } catch { S.bmcHistory = []; }
+}
+
+function bmcSetActiveTab(name) {
+  const el = document.querySelector(`#bmcTabs .tab[data-btab="${name}"]`);
+  if (el) el.click();
+}
+
+function bmcHistBack() { S.bmcHistIdx = -1; renderBMCView(); }
+
+// bmcSelFilterEntries 按天数过滤 SEL 条目（时间不可解析的条目始终保留）。
+function bmcSelFilterEntries(entries, days) {
+  if (!days || days === "all") return entries;
+  const cutoff = Date.now() - (+days) * 86400000;
+  return entries.filter((e) => {
+    if (!e.time) return true;
+    const t = new Date(String(e.time).replace(" ", "T"));
+    return isNaN(t.getTime()) ? true : t.getTime() >= cutoff;
+  });
+}
+
+// bmcSelDays/bmcSelGo SEL 天数筛选与翻页（全局函数，供报告内联调用）。
+function bmcSelDays(v) {
+  const id = S.bmcSel; if (!id) return;
+  const f = S.bmcSelFilter[id] = S.bmcSelFilter[id] || { days: 7, page: 1 };
+  f.days = v === "all" ? "all" : +v;
+  f.page = 1;
+  renderBMCView();
+}
+function bmcSelGo(delta) {
+  const id = S.bmcSel; if (!id) return;
+  const f = S.bmcSelFilter[id] = S.bmcSelFilter[id] || { days: 7, page: 1 };
+  f.page = Math.max(1, f.page + delta);
+  renderBMCView();
+}
+
+// renderBMCView BMC 详情按 Tab 渲染：巡检报告 / AI 分析 / 历史。
+function renderBMCView() {
+  const body = $("#bmcBody"); if (!body) return;
+  const id = S.bmcSel;
+  const r = S.bmcReports[id];
+  if (S.bmcView === "ai") {
+    const ai = S.bmcAIReports[id];
+    body.innerHTML = ai
+      ? aiSectionHTML(ai, "host")
+      : `<div class="empty"><div class="big">🤖</div>${t("ai.noReport")}<br><br>
+         ${r ? `<button class="btn primary" onclick="aiAnalyzeBMC('${esc(id)}')">${t("ai.analyze")}</button>` : ""}</div>`;
+    return;
+  }
+  if (S.bmcView === "hist") {
+    if (S.bmcHistIdx >= 0 && S.bmcHistory[S.bmcHistIdx]) {
+      const e = S.bmcHistory[S.bmcHistIdx];
+      body.innerHTML = `<div style="margin:4px 0 10px"><button class="btn small" onclick="bmcHistBack()">← ${t("host.backToList")}</button>
+        <span class="dim" style="font-size:12px;margin-left:10px">${new Date(e.time).toLocaleString()} · ${esc((e.report && e.report.health) || "")}</span></div>` +
+        aiSectionHTML(e.ai && { html: e.ai.html, model: e.ai.model, elapsedMs: 0, time: e.ai.time }, "host") + bmcReportHTML(e.report);
+      return;
+    }
+    if (!(S.bmcHistory || []).length) {
+      body.innerHTML = `<div class="empty"><div class="big">🕘</div>${t("host.histEmpty")}</div>`;
+      return;
+    }
+    body.innerHTML = `<table class="data"><tr><th>${t("th.time")}</th><th>${t("bmc.health")}</th><th>AI</th></tr>` +
+      S.bmcHistory.map((e, i) => `<tr class="hist-row" data-i="${i}" style="cursor:pointer">
+        <td>${new Date(e.time).toLocaleString()}</td>
+        <td>${esc((e.report && e.report.health) || "-")}</td>
+        <td>${e.ai ? `<span style="color:var(--brand)">🤖 ${esc(e.ai.model || "")}</span>` : `<span class="dim">—</span>`}</td>
+      </tr>`).join("") + `</table>`;
+    body.querySelectorAll(".hist-row").forEach((el) => {
+      el.onclick = () => { S.bmcHistIdx = +el.dataset.i; renderBMCView(); };
+    });
+    return;
+  }
+  // 默认：巡检报告
+  if (!r) {
+    body.innerHTML = `<div class="empty"><div class="big">🔍</div>${t("host.notInspected")}<br><br>
+      <button class="btn primary" onclick="inspectBMC('${esc(id)}')">${t("host.inspect")}</button></div>`;
+    return;
+  }
+  body.innerHTML = bmcReportHTML(r);
+}
+
+// bmcStatusHTML 状态/级别徽标（nominal→ok 绿 / warning→warn 橙 / critical→err 红）。
+function bmcStatusHTML(v, labels) {
+  const map = { nominal: "ok", normal: "ok", info: "ok", warning: "warn", critical: "err", unknown: "na" };
+  const cls = map[v] || "na";
+  const zh = { nominal: "正常", warning: "警告", critical: "严重", unknown: "不可用", info: "信息" };
+  const en = { nominal: "OK", warning: "Warning", critical: "Critical", unknown: "N/A", info: "Info" };
+  const text = labels ? (labels[v] || v) : (LANG === "zh" ? (zh[v] || v) : (en[v] || v));
+  return `<span class="${cls}">${esc(text)}</span>`;
+}
+
+// bmcReportHTML 渲染 BMC 巡检报告（与 HTML 导出报告同构）。
+function bmcReportHTML(r) {
+  if (!r) return "";
+  const healthCls = r.health === "严重" ? "err" : r.health === "警告" ? "warn" : r.health === "正常" ? "ok" : "na";
+  let html = `<h2 style="color:var(--brand);font-size:15px;margin:14px 0 8px">${t("bmc.health")}: <span class="${healthCls}">${esc(r.health || "-")}</span></h2>
+    <div class="dim" style="font-size:12px;margin:0 0 10px">${esc(r.healthDetail || "")}</div>`;
+  // BMC 设备
+  html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("bmc.secDevice")}</h2>`;
+  if (r.device) {
+    html += `<table class="data host-lr">
+      <tr><th>${LANG === "zh" ? "厂商" : "Vendor"}</th><td>${esc(r.device.manufacturer || "-")} (ID 0x${esc((r.device.manufacturerId || 0).toString(16))})</td></tr>
+      <tr><th>${LANG === "zh" ? "产品" : "Product"}</th><td>${esc(r.device.product || "-")}</td></tr>
+      <tr><th>${LANG === "zh" ? "固件版本" : "Firmware"}</th><td>${esc(r.device.firmware || "-")}</td></tr>
+      <tr><th>IPMI</th><td>${esc(r.device.ipmiVersion || "-")}</td></tr>
+      <tr><th>${LANG === "zh" ? "自检结果" : "Self-test"}</th><td>${esc(r.device.selfTest || "-")}</td></tr>
+      ${r.device.auxFirmware ? `<tr><th>${LANG === "zh" ? "辅助固件" : "Aux firmware"}</th><td>${esc(r.device.auxFirmware)}</td></tr>` : ""}
+    </table>`;
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.deviceNote || "-")}</div>`;
+  // 机箱状态
+  html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("bmc.secChassis")}</h2>`;
+  if ((r.chassis || []).length) {
+    html += `<table class="data host-lr">` + r.chassis.map((kv) => `<tr><th>${esc(kv.key)}</th><td>${esc(kv.value)}</td></tr>`).join("") + `</table>`;
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.chassisNote || "-")}</div>`;
+  // 硬件配置（CPU/内存/电源/风扇/盘位统计 + FRU 设备清单）
+  html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("bmc.secHw")}</h2>`;
+  if ((r.hardware || []).length) {
+    html += `<table class="data host-lr">` + r.hardware.map((kv) => `<tr><th>${esc(kv.key)}</th><td>${esc(kv.value)}</td></tr>`).join("") + `</table>`;
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.hardwareNote || "-")}</div>`;
+  // 传感器
+  html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("bmc.secSensors")}${(r.sensors || []).length ? ` (${r.sensors.length})` : ""}</h2>`;
+  if ((r.sensors || []).length) {
+    html += simpleTableHTML([LANG === "zh" ? "类型" : "Kind", LANG === "zh" ? "名称" : "Name", LANG === "zh" ? "读数" : "Reading", LANG === "zh" ? "状态" : "Status", LANG === "zh" ? "阈值" : "Range"],
+      r.sensors.map((s) => {
+        const crit = s.status === "critical";
+        const warn = s.status === "warning";
+        const valHTML = crit ? `<span class="err">${esc(s.value)}</span>` : warn ? `<span class="warn">${esc(s.value)}</span>` : esc(s.value);
+        return [s.kind, crit ? `<span class="err">${esc(s.name)}</span>` : esc(s.name), valHTML, bmcStatusHTML(s.status), s.range || "-"];
+      }));
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.sensorsNote || "-")}</div>`;
+  // FRU
+  html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("bmc.secFru")}</h2>`;
+  if ((r.fru || []).length) {
+    html += `<table class="data host-lr">` + r.fru.map((kv) => kv.key === "__fru"
+      ? `<tr><th style="color:var(--brand)">${esc(kv.value)}</th><td></td></tr>`
+      : `<tr><th>${esc(kv.key)}</th><td>${esc(kv.value)}</td></tr>`).join("") + `</table>`;
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.fruNote || "-")}</div>`;
+  // SEL（支持按天数筛选 + 分页）
+  html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("bmc.secSel")}</h2>`;
+  if (r.sel) {
+    html += `<div class="dim" style="font-size:12px;margin:0 0 6px">${LANG === "zh" ? "共" : "Total"} ${esc(r.sel.total)}: <span class="err">${r.sel.criticalCount}</span> / <span class="warn">${r.sel.warningCount}</span> / <span class="ok">${r.sel.infoCount}</span></div>`;
+    if ((r.sel.topErrors || []).length) html += `<div class="dim" style="font-size:12px">${LANG === "zh" ? "高频错误" : "Frequent errors"}:</div><pre class="sql-input" style="min-height:40px;max-height:120px;overflow:auto">${esc(r.sel.topErrors.join("\n"))}</pre>`;
+    if (r.sel.analysis) html += `<div class="dim" style="font-size:12px;margin:6px 0">${esc(r.sel.analysis)}</div>`;
+    if ((r.sel.entries || []).length) {
+      const fl = S.bmcSelFilter[S.bmcSel] = S.bmcSelFilter[S.bmcSel] || { days: 7, page: 1 };
+      const all = bmcSelFilterEntries(r.sel.entries, fl.days);
+      const pageSize = 50;
+      const pages = Math.max(1, Math.ceil(all.length / pageSize));
+      if (fl.page > pages) fl.page = pages;
+      const start = (fl.page - 1) * pageSize;
+      const rows = all.slice(start, start + pageSize);
+      const dayOpts = [1, 7, 30, 90].map((d) => `<option value="${d}" ${fl.days === d ? "selected" : ""}>${LANG === "zh" ? "最近 " + d + " 天" : "Last " + d + " days"}</option>`).join("");
+      html += `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px">
+        <span class="dim">${t("bmc.selRange")}</span>
+        <select onchange="bmcSelDays(this.value)" style="font-size:12px;padding:2px 6px">
+          ${dayOpts}<option value="all" ${fl.days === "all" ? "selected" : ""}>${t("bmc.selAll")}</option>
+        </select>
+        <span class="dim">${t("bmc.selFiltered")} <b>${all.length}</b> · ${t("bmc.selFetched")} ${r.sel.entries.length} · ${t("bmc.selTotal")} ${esc(r.sel.total)}</span>
+        <span style="flex:1"></span>
+        <button class="btn small" onclick="bmcSelGo(-1)" ${fl.page <= 1 ? "disabled" : ""}>←</button>
+        <span class="dim">${fl.page}/${pages}</span>
+        <button class="btn small" onclick="bmcSelGo(1)" ${fl.page >= pages ? "disabled" : ""}>→</button>
+      </div>`;
+      if (rows.length) {
+        html += simpleTableHTML([LANG === "zh" ? "时间" : "Time", "ID", LANG === "zh" ? "传感器" : "Sensor", LANG === "zh" ? "事件" : "Event", LANG === "zh" ? "级别" : "Severity"],
+          rows.map((e) => {
+            const cls = e.severity === "critical" ? "err" : e.severity === "warning" ? "warn" : "";
+            const wrap = (t2) => cls ? `<span class="${cls}">${esc(t2)}</span>` : esc(t2);
+            return [e.time, e.recordId, wrap(e.sensor), wrap(e.event), bmcStatusHTML(e.severity)];
+          }));
+      } else {
+        html += `<div class="empty" style="padding:8px;font-size:12px">${LANG === "zh" ? "所选时间范围内无事件" : "No events in selected range"}</div>`;
+      }
+    }
+    if (r.sel.note) html += `<div class="dim" style="font-size:12px;margin:6px 0">${esc(r.sel.note)}</div>`;
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.selNote || t("bmc.noSel"))}</div>`;
+  // 警告
+  if ((r.warnings || []).length) html += `<div class="empty" style="color:#d97706">${r.warnings.map((w) => "⚠ " + esc(w)).join("<br>")}</div>`;
+  return html;
+}
+
+async function inspectBMC(id) {
+  const A = API(); if (!A || S.bmcBusy) return;
+  const b = S.bmcs.find((x) => x.id === id); if (!b) return;
+  S.bmcBusy = true;
+  if (S.bmcSel !== id) showBMCDetail(id);
+  const prog = $("#bmcProg");
+  if (prog) prog.innerHTML = `<span class="host-prog"><span class="spin"></span>${t("bmc.inspecting")}…</span>` + progressBarHTML(0, 0);
+  $("#bStatus").textContent = "● " + t("bmc.inspecting");
+  $("#bStatus").className = "status-badge warn";
+  try {
+    const r = await A.InspectBMC(id);
+    S.bmcReports[id] = r;
+    if (prog) prog.textContent = `${t("host.doneAt")}: ${new Date(r.collectedAt).toLocaleTimeString()}`;
+    S.bmcView = "report"; S.bmcHistIdx = -1;
+    bmcSetActiveTab("report");
+    try { S.bmcHistory = (await A.GetBMCHistory(id)) || []; } catch { }
+    renderBMCView();
+    toast(t("bmc.inspectDone"), "ok");
+  } catch (e) {
+    showError(t("err.title"), { meta: `${b.name} · ${b.host}`, kind: "network", msg: String(e) });
+    if (prog) prog.textContent = "";
+  } finally {
+    S.bmcBusy = false;
+    renderBMCList(); renderBMCDash();
+    const bb = $("#bStatus");
+    if (bb) {
+      const st = bmcLastStatus(id);
+      bb.textContent = "● " + (st === "ok" ? t("st.ok") : st === "warn" ? t("host.badgeWarn") : st === "err" ? t("st.err") : t("st.na"));
+      bb.className = "status-badge " + st;
+    }
+  }
+}
+
+async function exportBMCReport(id) {
+  const A = API(); if (!A) return;
+  try {
+    const r = S.bmcReports[id];
+    const ai = S.bmcAIReports[id];
+    const p = await A.ExportBMCReport(id, r ? JSON.stringify(r) : "", ai ? ai.markdown : "");
+    if (p) toast(t("toast.exportOk") + p, "ok");
+  } catch (e) { if (String(e).indexOf("cancel") < 0) toast(t("toast.exportFail") + e, "err"); }
+}
+
+async function aiAnalyzeBMC(id) {
+  const A = API(); if (!A || S.aiBusy) return;
+  const r = S.bmcReports[id];
+  if (!r) { toast(t("ai.noReport"), "err"); return; }
+  const btn = $("#btnBmcAI");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ " + t("ai.analyzing"); }
+  S.aiBusy = true;
+  aiProgressOpen();
+  try {
+    const res = await A.AIAnalyzeBMC(JSON.stringify(r));
+    S.bmcAIReports[id] = res;
+    try { await A.AttachBMCAnalysis(id, JSON.stringify(r), res.markdown); } catch { }
+    S.bmcView = "ai"; S.bmcHistIdx = -1;
+    bmcSetActiveTab("ai");
+    toast(t("ai.done"), "ok");
+  } catch (e) {
+    showError(t("err.title"), { meta: `AI · ${id}`, kind: "unknown", msg: String(e) });
+  } finally {
+    S.aiBusy = false;
+    aiProgressClose();
+    if (btn) { btn.disabled = false; btn.textContent = t("ai.analyze"); }
+  }
+}
+
+function openBMCDialog(id) {
+  window._editBmcId = id || null;
+  if (id) {
+    const b = S.bmcs.find((x) => x.id === id);
+    $("#dlgBMCTitle").textContent = t("bmc.editTitle");
+    $("#bFName").value = b.name; $("#bFGroup").value = b.group || "";
+    $("#bFHost").value = b.host; $("#bFPort").value = b.port || 623;
+    $("#bFUser").value = b.user || ""; $("#bFPassword").value = ""; $("#bFTimeout").value = b.timeout || 10;
+  } else {
+    $("#dlgBMCTitle").textContent = t("bmc.newTitle");
+    $("#bFName").value = ""; $("#bFGroup").value = ""; $("#bFHost").value = "";
+    $("#bFPort").value = 623; $("#bFUser").value = "ADMIN"; $("#bFPassword").value = ""; $("#bFTimeout").value = 10;
+  }
+  $("#bmcTestResult").textContent = "";
+  $("#dlgBMC").showModal();
+}
+
+function collectBMCForm() {
+  const b = { id: window._editBmcId || "" };
+  b.name = $("#bFName").value.trim() || $("#bFHost").value.trim();
+  b.group = $("#bFGroup").value.trim();
+  b.host = $("#bFHost").value.trim();
+  b.port = parseInt($("#bFPort").value) || 623;
+  b.user = $("#bFUser").value.trim();
+  b.password = $("#bFPassword").value;
+  b.timeout = parseInt($("#bFTimeout").value) || 10;
+  return b;
+}
+
+async function saveBMC() {
+  const A = API(); if (!A) return;
+  const editId = window._editBmcId;
+  const b = collectBMCForm();
+  try {
+    await A.SaveBMC(b);
+    window._editBmcId = null;
+    $("#dlgBMC").close();
+    toast(t("toast.saved"), "ok");
+    await reload();
+    switchMode("bmc");
+    if (editId && S.bmcSel === editId) showBMCDetail(editId);
+  } catch (e) { toast(t("toast.saveFail") + e, "err"); }
+}
+
+async function testBMCConn() {
+  const A = API(); if (!A) return;
+  const b = collectBMCForm();
+  const el = $("#bmcTestResult");
+  if (el) { el.className = ""; el.textContent = LANG === "zh" ? "测试中…" : "Testing…"; }
+  try {
+    const r = await A.TestBMC(b);
+    if (r && r.ok) {
+      const msg = `✓ ${t("bmc.testOk")}　${r.detail || ""}`;
+      if (el) { el.className = "ok"; el.textContent = msg; }
+    } else {
+      const detail = r ? (r.detail || "failed") : "unknown";
+      if (el) { el.className = "err"; el.textContent = "✗ " + detail; }
+    }
+  } catch (e) {
+    if (el) { el.className = "err"; el.textContent = "✗ " + String(e); }
+  }
+}
+
+async function deleteBMC(id) {
+  const A = API(); if (!A) return;
+  if (S.bmcDeleteArmed !== id) {
+    S.bmcDeleteArmed = id;
+    $("#btnBmcDelete").textContent = t("detail.delConfirm");
+    setTimeout(() => { S.bmcDeleteArmed = null; const btn = $("#btnBmcDelete"); if (btn) btn.textContent = t("detail.del"); }, 2500);
+    return;
+  }
+  S.bmcDeleteArmed = null;
+  await A.DeleteBMC(id);
+  delete S.bmcReports[id]; delete S.bmcAIReports[id];
+  S.bmcSel = null;
+  $("#bmcDetail").style.display = "none";
+  $("#bmcDash").style.display = "";
+  toast(t("toast.deleted"), "ok");
+  await reload();
+  renderBMCList(); renderBMCDash();
 }
 
 function osIcon(osName) {
@@ -2910,6 +3366,27 @@ function bind() {
   $("#btnHostExport").onclick = () => exportHostReport(S.hostSel);
   $("#btnHostEdit").onclick = () => openHostDialog(S.hostSel);
   $("#btnHostDelete").onclick = () => deleteHost(S.hostSel);
+  // ---------- BMC 带外巡检 ----------
+  $("#modeBmc").onclick = () => switchMode("bmc");
+  $("#btnAddBmc").onclick = () => openBMCDialog(null);
+  $("#bBtnTest").onclick = testBMCConn;
+  $("#bBtnSave").onclick = saveBMC;
+  $("#bBtnCancel").onclick = () => { window._editBmcId = null; $("#dlgBMC").close(); };
+  $("#btnBmcBack").onclick = () => { $("#bmcDetail").style.display = "none"; $("#bmcDash").style.display = ""; renderBMCDash(); };
+  $("#btnBmcInspect").onclick = () => inspectBMC(S.bmcSel);
+  $("#btnBmcAI").onclick = () => aiAnalyzeBMC(S.bmcSel);
+  $("#btnBmcExport").onclick = () => exportBMCReport(S.bmcSel);
+  $("#btnBmcEdit").onclick = () => openBMCDialog(S.bmcSel);
+  $("#btnBmcDelete").onclick = () => deleteBMC(S.bmcSel);
+  document.querySelectorAll("#bmcTabs .tab").forEach((el) => {
+    el.onclick = () => {
+      document.querySelectorAll("#bmcTabs .tab").forEach((x) => x.classList.remove("active"));
+      el.classList.add("active");
+      S.bmcHistIdx = -1;
+      S.bmcView = el.dataset.btab || "report";
+      renderBMCView();
+    };
+  });
   // ---------- 类 nmap 端口扫描 ----------
   $("#btnNmapScan").onclick = async () => {
     $("#nmapResult").innerHTML = "";
@@ -3208,6 +3685,12 @@ window.addEventListener("resize", () => {
       if (!S.hostBusy || !p) return;
       const prog = $("#hostProg"); if (!prog) return;
       prog.innerHTML = `<span class="host-prog"><span class="spin"></span>${esc(t("host.step." + (p.section || "")))}</span>` + progressBarHTML(p.done || 0, p.total || 0);
+    });
+    // BMC 带外巡检逐节进度
+    window.runtime.EventsOn("bmc:progress", (p) => {
+      if (!S.bmcBusy || !p) return;
+      const prog = $("#bmcProg"); if (!prog) return;
+      prog.innerHTML = `<span class="host-prog"><span class="spin"></span>${esc(t("bmc.step." + (p.section || "")))}</span>` + progressBarHTML(p.done || 0, p.total || 0);
     });
     // 类 nmap 扫描逐端口进度（百分比进度条）
     window.runtime.EventsOn("nmap:progress", (p) => {

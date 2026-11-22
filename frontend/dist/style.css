@@ -314,7 +314,7 @@ dialog {
   border: none; border-radius: 14px; padding: 0; width: 660px; max-width: 92vw;
   box-shadow: var(--shadow); background: var(--panel); color: var(--txt);
 }
-dialog::backdrop { background: #0f1c3366; backdrop-filter: blur(2px); }
+dialog::backdrop { background: transparent; }
 dialog form { padding: 22px 24px; }
 dialog h3 { margin-bottom: 16px; font-size: 16px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
@@ -563,3 +563,8 @@ table.data, table.host-lr, table.ov-list, .pbar-row .dim {
 .loading { text-align: center; color: var(--dim); padding: 40px 0; }
 .spin { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--scroll); border-top-color: var(--brand); border-radius: 50%; animation: sp 1s linear infinite; vertical-align: -4px; margin-right: 8px; }
 @keyframes sp { to { transform: rotate(360deg); } }
+/* 全局状态文字色（BMC 巡检等表格内使用）：严重红 / 警告橙 / 正常绿 / 未知灰 */
+.ok { color: var(--ok); }
+.err { color: var(--err); }
+.warn { color: var(--warn); }
+.na { color: var(--dim); }

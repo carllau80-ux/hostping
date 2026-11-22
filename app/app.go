@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"dbping/internal/bmc"
 	"dbping/internal/config"
 	"dbping/internal/hostinsp"
 	"dbping/internal/model"
@@ -416,6 +417,110 @@ func (a *App) InspectHost(id string) (*model.HostReport, error) {
 	log.Printf("[host] 巡检完成 %s: OS=%s, rs进程=%d, 警告=%d",
 		h.Name, report.OSName, len(report.RSProcs), len(report.Warnings))
 	return report, nil
+}
+
+// ---------- BMC 带外巡检（IPMI） ----------
+
+// GetBMCs 返回 BMC 连接列表（脱敏）。
+func (a *App) GetBMCs() []model.BMCHost {
+	return a.store().ListBMCs()
+}
+
+// SaveBMC 新增/更新 BMC 连接（密码留空表示保持不变）。
+func (a *App) SaveBMC(b model.BMCHost) error {
+	if b.Host == "" {
+		return fmt.Errorf("BMC 地址不能为空")
+	}
+	if err := a.store().UpsertBMC(b); err != nil {
+		return err
+	}
+	log.Printf("[bmc] 保存 BMC 连接: %s (%s:%d)", b.Name, b.Host, b.Port)
+	return a.store().Save()
+}
+
+// DeleteBMC 删除 BMC 连接。
+func (a *App) DeleteBMC(id string) error {
+	a.store().DeleteBMC(id)
+	log.Printf("[bmc] 删除 BMC 连接: %s", id)
+	return a.store().Save()
+}
+
+// TestBMC 测试 BMC 连通性（连接 + GetDeviceID；密码留空沿用已存凭据）。
+func (a *App) TestBMC(b model.BMCHost) map[string]any {
+	if b.ID != "" {
+		if old, ok := a.store().GetBMC(b.ID); ok && b.Password == "" {
+			b.Password = old.Password
+		}
+	}
+	return bmc.TestBMC(&b)
+}
+
+// InspectBMC 执行 BMC 带外巡检（同步，逐节推送进度事件）。
+func (a *App) InspectBMC(id string) (*model.BMCReport, error) {
+	b, ok := a.store().GetBMC(id)
+	if !ok {
+		return nil, fmt.Errorf("BMC 连接不存在")
+	}
+	report, err := bmc.InspectBMC(&b, func(section string, done, total int) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "bmc:progress", map[string]any{
+				"section": section, "done": done, "total": total,
+			})
+		}
+	})
+	if err != nil {
+		log.Printf("[bmc] 巡检失败 %s: %v", b.Name, err)
+		return nil, err
+	}
+	// 巡检结果历史保留（最新在前，每台最多 10 条）
+	st := a.store()
+	st.AddBMCHistory(id, *report)
+	if err := st.Save(); err != nil {
+		log.Printf("[bmc] 巡检历史保存失败: %v", err)
+	}
+	log.Printf("[bmc] 巡检完成 %s: 健康=%s, 传感器=%d", b.Name, report.Health, len(report.Sensors))
+	return report, nil
+}
+
+// GetBMCHistory 返回 BMC 巡检历史（最新在前，每台最多 10 条）。
+func (a *App) GetBMCHistory(id string) []model.BMCHistoryEntry {
+	return a.store().GetBMCHistory(id)
+}
+
+// ExportBMCReport 导出 BMC 综合 HTML 报告（巡检 + AI 分析，带目录跳转），返回保存路径。
+// reportJSON/aiMarkdown 为前端当前展示的报告与 AI 分析（可空；为空时重新采集巡检）。
+func (a *App) ExportBMCReport(id, reportJSON, aiMarkdown string) (string, error) {
+	b, ok := a.store().GetBMC(id)
+	if !ok {
+		return "", fmt.Errorf("BMC 连接不存在")
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "导出 BMC 综合报告（巡检 + AI）",
+		DefaultFilename: fmt.Sprintf("HostPing BMC报告_%s_%s.html", b.Name, time.Now().Format("20060102_150405")),
+		Filters:         []runtime.FileFilter{{DisplayName: "HTML 报告", Pattern: "*.html"}},
+	})
+	if err != nil || path == "" {
+		return "", err
+	}
+	// 优先用前端传入的当前报告（避免重复巡检）；无则重新采集
+	var report *model.BMCReport
+	if strings.TrimSpace(reportJSON) != "" {
+		r := model.BMCReport{}
+		if json.Unmarshal([]byte(reportJSON), &r) == nil && r.CollectedAt > 0 {
+			report = &r
+		}
+	}
+	if report == nil {
+		report, err = bmc.InspectBMC(&b, nil)
+		if err != nil {
+			return "", err
+		}
+	}
+	if err := writeHTML(path, renderCombinedBMC(b, report, aiMarkdown, a.store().Settings.AIModel)); err != nil {
+		return "", err
+	}
+	log.Printf("[bmc] 综合报告已导出: %s", path)
+	return path, nil
 }
 
 // NmapScan 类 nmap 端口扫描（并发 TCP 连接探测 + TTL/Banner 系统推测，从本机直接连目标）。

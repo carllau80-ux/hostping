@@ -7,6 +7,7 @@ Go 语言开发的数据库健康检查与元数据采集桌面工具：**纯 Go
 ## 功能
 
 - **三级 Ping 探活**：TCP 端口 → 认证登录 → SQL 探活，分别统计延迟，失败原因中文分类（网络不通/认证失败/权限不足/超时…）
+- **BMC 带外巡检（IPMI 2.0）**：输入 BMC 地址/用户/密码，经 RMCP+（UDP 623）免客户端采集——设备信息与自检、机箱状态、全量传感器读数（温度/电压/风扇，阈值判级）、FRU 硬件清单、SEL 系统事件日志（中文事件解码 + 严重级别分类 + 高频错误聚合 + 规则化分析）；独立页面 + 连接管理 + 历史 + AI 分析 + HTML 导出；纯 Go 实现（bougou/go-ipmi）
 - **元数据采集**：版本、实例、主备角色、只读、**归档/日志模式**（附各库开启归档的参考命令提示）、字符集、启动时间、库大小、表数量、连接数、Top N 大表、表空间/数据文件、集群节点
 - **拓扑展示**：自上而下分层树形图（实例层 → 集群/复制层 → 数据库层 → 表空间层 → 表层，ECharts 离线渲染）；分布式库（TiDB/OceanBase/ClickHouse/Doris 等）展示集群组件拓扑
 - **概览页**：大数据库图标 + 列表式信息展示
@@ -57,7 +58,11 @@ internal/
     clickhouse/redis/mongo 三类
   config/                  配置持久化 + AES-GCM 密码加密
   monitor/                 并发巡检调度 + 定时循环 + 历史
+  hostinsp/                主机 SSH 巡检（系统/RAID/ZFS/安全/日志）
+  bmc/                     BMC 带外巡检（IPMI 2.0：设备/传感器/FRU/SEL，纯 Go）
 frontend/dist/             原生 HTML/JS 前端 + echarts.min.js
+devtools/bmctest           BMC 巡检命令行验证工具
 ```
 
 新增一个数据库 = 在 `provider.TypeInfos` 注册一条类型 +（必要时）加一个查询方言分支。
+BMC 巡检验证：`go run ./devtools/bmctest -host <BMC IP> -user <用户> -pass <密码>`

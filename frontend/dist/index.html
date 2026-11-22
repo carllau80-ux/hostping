@@ -19,14 +19,17 @@
     </div>
     <div class="mode-switch">
       <button class="mode-btn" id="modeHost" data-i18n="mode.host">🖥 主机</button>
+      <button class="mode-btn" id="modeBmc" data-i18n="mode.bmc">🔌 BMC</button>
       <button class="mode-btn active" id="modeDb" data-i18n="mode.db">🗄 数据库</button>
     </div>
     <div class="side-actions">
       <button class="btn primary" id="btnAdd" data-i18n="side.add">＋ 新建连接</button>
       <button class="btn primary" id="btnAddHost" data-i18n="side.addHost" style="display:none">＋ 新建主机</button>
+      <button class="btn primary" id="btnAddBmc" data-i18n="side.addBmc" style="display:none">＋ 新建 BMC</button>
     </div>
     <div id="connList" class="conn-list"></div>
     <div id="hostList" class="conn-list" style="display:none"></div>
+    <div id="bmcList" class="conn-list" style="display:none"></div>
     <div class="side-nmap-wrap">
       <button class="btn" id="btnNmapScan" style="width:100%"><span data-i18n="nmap.title">🔎 端口扫描</span></button>
       <button class="btn" id="btnIperf" style="width:100%;margin-top:6px"><span data-i18n="spd.title">🚀 测速</span></button>
@@ -126,6 +129,42 @@
         <div class="tab" data-htab="hist" data-i18n="host.tabHist">历史</div>
       </div>
       <div class="tab-body" id="hostBody" style="min-height:420px"></div>
+    </div>
+
+    <div id="bmcDash" style="display:none">
+      <div class="dash-head">
+        <h2 data-i18n="bmcdash.title">BMC 带外巡检</h2>
+        <div class="stat-row" id="bmcStatRow"></div>
+      </div>
+      <div id="bmcCards" class="cards"></div>
+    </div>
+
+    <div id="bmcDetail" style="display:none">
+      <div class="detail-head">
+        <button class="btn back" id="btnBmcBack">← <span data-i18n="detail.backShort">返回</span></button>
+        <div class="detail-title">
+          <span class="big-icon">🔌</span>
+          <div>
+            <div id="bName" class="d-name"></div>
+            <div id="bMeta" class="d-meta dim"></div>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <span id="bStatus" class="status-badge"></span>
+          <button class="btn primary" id="btnBmcInspect" data-i18n="host.inspect">🔍 执行巡检</button>
+          <button class="btn" id="btnBmcAI" data-i18n="ai.analyze">🤖 AI 分析</button>
+          <button class="btn" id="btnBmcExport" data-i18n="detail.export">⇓ 导出报告</button>
+          <button class="btn" id="btnBmcEdit" data-i18n="detail.edit">✎ 编辑</button>
+          <button class="btn danger" id="btnBmcDelete" data-i18n="detail.del">✕ 删除</button>
+        </div>
+      </div>
+      <div id="bmcProg" class="dim" style="padding:4px 2px;font-size:12px"></div>
+      <div class="tabs" id="bmcTabs">
+        <div class="tab active" data-btab="report" data-i18n="host.tabReport">巡检报告</div>
+        <div class="tab" data-btab="ai" data-i18n="ai.tab">🤖 AI 分析</div>
+        <div class="tab" data-btab="hist" data-i18n="host.tabHist">历史</div>
+      </div>
+      <div class="tab-body" id="bmcBody" style="min-height:420px"></div>
     </div>
   </main>
 </div>
@@ -369,6 +408,49 @@
       <div class="dlg-foot-right">
         <button class="btn primary" type="button" id="hBtnSave" data-i18n="dlg.save">保存</button>
         <button class="btn" type="button" id="hBtnCancel" data-i18n="dlg.cancel">取消</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<!-- BMC 编辑对话框 -->
+<dialog id="dlgBMC">
+  <form id="formBMC" method="dialog">
+    <h3 id="dlgBMCTitle" data-i18n="bmc.newTitle">新建 BMC 连接</h3>
+    <div class="grid2">
+      <label class="lb-stack"><span data-i18n="dlg.name">显示名称</span>
+        <input id="bFName" data-i18n-ph="dlg.namePh" placeholder="如：生产-服务器1" />
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.group">分组</span>
+        <input id="bFGroup" data-i18n-ph="dlg.groupPh" placeholder="如：生产环境" />
+      </label>
+      <div class="host-port-row wide">
+        <label class="lb-stack grow"><span data-i18n="bmc.addr">BMC 地址</span>
+          <input id="bFHost" data-i18n-ph="bmc.addrPh" placeholder="BMC 管理 IP" required />
+        </label>
+        <label class="lb-stack port"><span data-i18n="dlg.port">端口</span>
+          <input id="bFPort" type="number" min="1" max="65535" value="623" />
+        </label>
+      </div>
+      <label class="lb-stack"><span data-i18n="bmc.user">BMC 用户名</span>
+        <input id="bFUser" placeholder="ADMIN" />
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.pass">密码</span>
+        <input id="bFPassword" type="password" autocomplete="new-password" data-i18n-ph="dlg.passKeep" placeholder="留空保持原密码" />
+      </label>
+      <label class="lb-stack"><span data-i18n="dlg.timeout">超时（秒）</span>
+        <input id="bFTimeout" type="number" min="1" max="120" value="10" />
+      </label>
+    </div>
+    <div class="hint dim" data-i18n="bmc.hint"></div>
+    <div class="dlg-foot">
+      <div class="dlg-foot-left">
+        <button class="btn" type="button" id="bBtnTest" data-i18n="host.testConn">🔌 测试连接</button>
+        <span id="bmcTestResult"></span>
+      </div>
+      <div class="dlg-foot-right">
+        <button class="btn primary" type="button" id="bBtnSave" data-i18n="dlg.save">保存</button>
+        <button class="btn" type="button" id="bBtnCancel" data-i18n="dlg.cancel">取消</button>
       </div>
     </div>
   </form>

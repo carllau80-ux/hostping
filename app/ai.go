@@ -94,6 +94,119 @@ func (a *App) AIAnalyzeHost(reportJSON string) (map[string]any, error) {
 	}, nil
 }
 
+// AIAnalyzeBMC 分析 BMC 带外巡检报告（reportJSON 为前端传来的 BMCReport JSON）。
+// 返回 {markdown, html, model, elapsedMs}。
+func (a *App) AIAnalyzeBMC(reportJSON string) (map[string]any, error) {
+	base, key, modelName, err := a.aiConfig()
+	if err != nil {
+		return nil, err
+	}
+	var r model.BMCReport
+	if err := json.Unmarshal([]byte(reportJSON), &r); err != nil {
+		return nil, fmt.Errorf("BMC 巡检报告数据无效: %w", err)
+	}
+	prompt := bmcReportDigest(&r)
+	start := time.Now()
+	md, err := aiChat(base, key, modelName, aiSystemPrompt("bmc"), prompt, 180*time.Second)
+	if err != nil {
+		log.Printf("[ai] BMC 分析失败 %s: %v", r.Name, err)
+		return nil, err
+	}
+	elapsed := time.Since(start).Milliseconds()
+	log.Printf("[ai] BMC 分析完成 %s: model=%s, %dms, %d 字", r.Name, modelName, elapsed, len([]rune(md)))
+	return map[string]any{
+		"markdown":  md,
+		"html":      mdToHTML(md),
+		"model":     modelName,
+		"elapsedMs": elapsed,
+		"time":      time.Now().UnixMilli(),
+	}, nil
+}
+
+// AttachBMCAnalysis 将 BMC AI 分析挂到巡检历史（按 CollectedAt 匹配），并持久化。
+func (a *App) AttachBMCAnalysis(id, reportJSON, markdown string) error {
+	st := a.store()
+	var r model.BMCReport
+	if err := json.Unmarshal([]byte(reportJSON), &r); err != nil {
+		return fmt.Errorf("BMC 巡检报告数据无效: %w", err)
+	}
+	ai := model.AIAnalysis{
+		Markdown: markdown,
+		HTML:     mdToHTML(markdown),
+		Model:    st.Settings.AIModel,
+		Time:     time.Now().UnixMilli(),
+	}
+	st.AttachBMCAI(id, r, ai)
+	return st.Save()
+}
+
+// bmcReportDigest BMC 巡检报告 → AI 上下文文本。
+func bmcReportDigest(r *model.BMCReport) string {
+	var b strings.Builder
+	w := func(f string, a ...any) { fmt.Fprintf(&b, f, a...) }
+	w("# BMC 带外巡检 — %s（%s:%d，用户 %s，采集时间 %s）\n", r.Name, r.Host, r.Port, r.User, time.UnixMilli(r.CollectedAt).Format("2006-01-02 15:04:05"))
+	w("- 总体健康：%s（%s）\n", r.Health, r.HealthDetail)
+	if r.Device != nil {
+		w("\n## BMC 设备\n- 厂商：%s · 产品：%s · 固件：%s · IPMI：%s · 自检：%s\n", r.Device.Manufacturer, r.Device.Product, r.Device.Firmware, r.Device.IPMIVersion, r.Device.SelfTest)
+	} else if r.DeviceNote != "" {
+		w("\n## BMC 设备\n- %s\n", r.DeviceNote)
+	}
+	if len(r.Chassis) > 0 {
+		w("\n## 机箱状态\n")
+		for _, kv := range r.Chassis {
+			w("- %s: %s\n", kv.Key, kv.Value)
+		}
+	} else if r.ChassisNote != "" {
+		w("\n## 机箱状态\n- %s\n", r.ChassisNote)
+	}
+	if len(r.Hardware) > 0 {
+		w("\n## 硬件配置\n")
+		for _, kv := range r.Hardware {
+			w("- %s: %s\n", kv.Key, kv.Value)
+		}
+	} else if r.HardwareNote != "" {
+		w("\n## 硬件配置\n- %s\n", r.HardwareNote)
+	}
+	if len(r.Sensors) > 0 {
+		w("\n## 传感器（%d）\n| 类型 | 名称 | 读数 | 状态 | 阈值 |\n", len(r.Sensors))
+		for _, s := range r.Sensors {
+			w("| %s | %s | %s | %s | %s |\n", s.Kind, s.Name, s.Value, s.Status, s.Range)
+		}
+	} else if r.SensorsNote != "" {
+		w("\n## 传感器\n- %s\n", r.SensorsNote)
+	}
+	if len(r.FRU) > 0 {
+		w("\n## FRU 硬件清单\n")
+		for _, kv := range r.FRU {
+			if kv.Key == "__fru" {
+				w("- 设备 %s\n", kv.Value)
+			} else {
+				w("- %s: %s\n", kv.Key, kv.Value)
+			}
+		}
+	} else if r.FRUNote != "" {
+		w("\n## FRU\n- %s\n", r.FRUNote)
+	}
+	if r.SEL != nil {
+		w("\n## SEL 系统事件日志（共 %s 条：严重 %d / 警告 %d / 信息 %d）\n", r.SEL.Total, r.SEL.CriticalCount, r.SEL.WarningCount, r.SEL.InfoCount)
+		if r.SEL.Analysis != "" {
+			w("- 规则摘要：%s\n", r.SEL.Analysis)
+		}
+		for _, e := range r.SEL.Entries {
+			w("- %s [%s] %s: %s\n", e.Time, e.Severity, e.Sensor, e.Event)
+		}
+	} else if r.SELNote != "" {
+		w("\n## SEL\n- %s\n", r.SELNote)
+	}
+	if len(r.Warnings) > 0 {
+		w("\n## 巡检警告\n")
+		for _, wn := range r.Warnings {
+			w("- %s\n", wn)
+		}
+	}
+	return b.String()
+}
+
 // AIAnalyzeOverview 分析数据库巡检概览（ovJSON 为前端传来的 Overview JSON，id 用于补充连接信息）。
 func (a *App) AIAnalyzeOverview(id, ovJSON string) (map[string]any, error) {
 	base, key, modelName, err := a.aiConfig()
@@ -249,6 +362,15 @@ func (a *App) AIExportHostAnalysis(reportJSON, markdown string) (string, error) 
 // ---------- 大模型调用（OpenAI 兼容 chat/completions） ----------
 
 func aiSystemPrompt(kind string) string {
+	if kind == "bmc" {
+		return "你是资深服务器硬件运维专家，负责分析 HostPing 巡检工具通过 IPMI 从 BMC 采集的服务器带外巡检数据（字段含义：device BMC 自身信息、chassis 机箱状态、sensors 传感器读数列表（value 已换算数值+单位、status 为 nominal/warning/critical）、fru 硬件清单、sel 系统事件日志（severity 为 critical/warning/info，topErrors 为高频错误聚合，analysis 为规则化摘要））。" +
+			"请基于数据输出一份简体中文分析报告，使用 Markdown 格式，结构如下：" +
+			"## 总体结论（正常 / 关注 / 风险，一句话说明）；" +
+			"## 关键发现（按严重程度排序，引用具体传感器读数与 SEL 事件作为依据，无异常则说明检查项均正常）；" +
+			"## 逐项分析（BMC 固件与自检、机箱电源状态、硬件配置（CPU/内存/电源/风扇/盘位）、温度/电压/风扇水位、FRU 硬件清单、SEL 事件日志根因推测等，仅分析有数据的项，无数据的项跳过）；" +
+			"## 处置建议（可执行的措施清单）。\n" +
+			"严格要求：只依据给出的数据分析，不得编造；温度接近阈值、风扇转速偏低、电源模块故障、ECC 错误、机箱入侵等需重点提示；语气专业简洁，避免空话。"
+	}
 	if kind == "db" {
 		return "你是资深数据库运维专家，负责分析 HostPing 巡检工具采集的数据库巡检概览数据（JSON 格式，字段含义：version 版本、role 主库/从库/备库、archiveMode 归档模式、charset 字符集、connCur/connMax 当前与最大连接数、dbSize 数据库大小、tableCount 表数量、cluster 集群形态、extra 类型特有信息等）。" +
 			"请基于数据输出一份简体中文分析报告，使用 Markdown 格式，结构如下：" +
