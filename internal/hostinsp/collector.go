@@ -1,7 +1,6 @@
 package hostinsp
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -302,76 +301,136 @@ func collectStorcli(c *SSHClient, r *model.HostReport, run func(string) string) 
 		r.StorcliNote = "未检测到 RAID 卡或未安装 storcli64（/opt/MegaRAID/storcli/storcli64 不存在）"
 		return
 	}
-	out := run(bin + " /cALL show J 2>/dev/null")
-	if strings.TrimSpace(out) == "" {
+	rawShow := run(bin + " /cALL show J 2>/dev/null")
+	if strings.TrimSpace(rawShow) == "" {
 		r.StorcliNote = "storcli64 已安装但未返回数据（可能无 RAID 卡或权限不足）"
 		return
 	}
-	rep, err := parseStorcliJSON(out)
+	rep, err := parseStorcliJSON(rawShow)
 	if err != nil {
 		r.StorcliNote = "storcli64 输出解析失败：" + shortErr(err)
 		return
 	}
-	// PD 摘要缺 SN 时，用明细 JSON 补齐 SN / 通电时长
+	// 原始输出收集（诊断用：完整呈现 storcli 各命令输出）
+	var raw strings.Builder
+	addRaw := func(cmd, out string) {
+		if strings.TrimSpace(out) == "" {
+			return
+		}
+		s := strings.TrimSpace(out)
+		if len(s) > 200*1024 {
+			s = s[:200*1024] + "\n…（超长截断）"
+		}
+		fmt.Fprintf(&raw, "=== %s ===\n%s\n", cmd, s)
+	}
+	addRaw(bin+" /cALL show J", rawShow)
+	// PD 摘要缺信息时，用明细 JSON 补齐 SN / 通电时长 / 温度 / 介质 / 接口
+	rawPD := ""
 	needEnrich := false
 	for _, ctl := range rep.Controllers {
 		for _, pd := range ctl.PDs {
-			if pd.SN == "" || pd.Power == "" {
+			if pd.SN == "" || pd.Power == "" || pd.Temp == "" || pd.MediaType == "" || pd.Interface == "" {
 				needEnrich = true
 				break
 			}
 		}
 	}
 	if needEnrich {
-		enrichStorcliPDs(run(bin+" /cALL /eALL /sALL show J 2>/dev/null"), rep)
+		rawPD = run(bin + " /cALL /eALL /sALL show J 2>/dev/null")
+		enrichStorcliPDs(rawPD, rep)
+		addRaw(bin+" /cALL /eALL /sALL show J", rawPD)
 	}
-	// 摘要通常不含 BBU：单独查电池状态
+	// show all 富化控制器固件 / ROC 温度 / 内存 / 控制器状态（摘要不含时；show all 仅保证单控制器形式）
+	if anyCtlFieldEmpty(rep) && len(rep.Controllers) > 0 {
+		rawShowAll := run(fmt.Sprintf("%s /c%d show all J 2>/dev/null", bin, 0))
+		parseStorcliShowAllCtl(rawShowAll, &rep.Controllers[0])
+		addRaw(fmt.Sprintf("%s /c0 show all J", bin), rawShowAll)
+		for i := 1; i < len(rep.Controllers); i++ {
+			o := run(fmt.Sprintf("%s /c%d show all J 2>/dev/null", bin, i))
+			parseStorcliShowAllCtl(o, &rep.Controllers[i])
+			addRaw(fmt.Sprintf("%s /c%d show all J", bin, i), o)
+		}
+	}
+	// 摘要通常不含电池：单独查 BBU / CacheVault 详情（9364-8i 等卡用 CacheVault，storcli 仍走 /bbu 对象，部分版本需 /cv）
 	for i := range rep.Controllers {
-		if rep.Controllers[i].Battery != "" {
-			continue
-		}
-		bb := run(fmt.Sprintf("%s /c%d /bbu show J 2>/dev/null", bin, i))
-		if s := parseBBUState(bb); s != "" {
-			rep.Controllers[i].Battery = s
+		ctl := &rep.Controllers[i]
+		if ctl.Battery == "" || ctl.BatteryDetail == "" {
+			bb := run(fmt.Sprintf("%s /c%d /bbu show all J 2>/dev/null", bin, i))
+			addRaw(fmt.Sprintf("%s /c%d /bbu show all J", bin, i), bb)
+			if ctl.Battery == "" {
+				ctl.Battery = parseBBUState(bb)
+			}
+			if ctl.BatteryDetail == "" {
+				ctl.BatteryDetail = parseBBUDetail(bb)
+			}
+			if ctl.Battery == "" && ctl.BatteryDetail == "" {
+				cv := run(fmt.Sprintf("%s /c%d /cv show all J 2>/dev/null", bin, i))
+				addRaw(fmt.Sprintf("%s /c%d /cv show all J", bin, i), cv)
+				ctl.Battery = parseBBUState(cv)
+				ctl.BatteryDetail = parseBBUDetail(cv)
+			}
 		}
 	}
+	// VD 条带大小与 Span 结构（摘要 VD LIST 不含）
+	needVD := false
+	for _, ctl := range rep.Controllers {
+		for _, v := range ctl.VDs {
+			if v.Strip == "" || v.Spans == "" {
+				needVD = true
+				break
+			}
+		}
+	}
+	if needVD {
+		for i := range rep.Controllers {
+			o := run(fmt.Sprintf("%s /c%d /vALL show all J 2>/dev/null", bin, i))
+			enrichStorcliVDsCtl(o, &rep.Controllers[i])
+			addRaw(fmt.Sprintf("%s /c%d /vALL show all J", bin, i), o)
+		}
+	}
+	rep.Raw = raw.String()
 	r.Storcli = rep
 }
 
-// parseBBUState 从 `/cN /bbu show J` 提取电池状态摘要。
-func parseBBUState(out string) string {
-	out = strings.TrimSpace(out)
-	if i := strings.IndexByte(out, '{'); i >= 0 {
-		if j := strings.LastIndexByte(out, '}'); j > i {
-			out = out[i : j+1]
+// anyCtlFieldEmpty 任一控制器仍有未填的固件/温度/内存。
+func anyCtlFieldEmpty(rep *model.StorcliReport) bool {
+	for _, c := range rep.Controllers {
+		if c.Firmware == "" || c.Temp == "" || c.Memory == "" {
+			return true
 		}
 	}
-	var root map[string]any
-	if json.Unmarshal([]byte(out), &root) != nil {
-		return ""
-	}
-	ctlAny, ok := root["Controllers"].([]any)
-	if !ok || len(ctlAny) == 0 {
-		return ""
-	}
-	cm, ok := ctlAny[0].(map[string]any)
-	if !ok {
-		return ""
-	}
-	rd, _ := cm["Response Data"].(map[string]any)
+	return len(rep.Controllers) == 0
+}
+
+// parseBBUState 从 `/cN /bbu show all J` 提取电池状态摘要（兼容 BBU_Info 数组 / Cachevault_Info 映射）。
+func parseBBUState(out string) string {
+	rd := storcliCtlResponse(out, 0)
 	if rd == nil {
 		return ""
 	}
+	m := storcliBBUMap(rd)
 	state := firstNonEmpty(
+		asString(m["Battery State"]),
+		asString(m["State"]),
 		asString(rd["Battery State"]),
 		asString(rd["Battery Status"]),
 		nestedString(rd, "Battery", "Battery State"),
-		nestedString(rd, "BBU Info", "Battery State"),
 	)
 	if state == "" {
 		return ""
 	}
-	cap := firstNonEmpty(asString(rd["Capacity"]), asString(rd["Full Charge Capacity"]), asString(rd["Battery Capacity"]))
+	// BBU 用容量百分比，CacheVault 用电容（Capacitance）/健康度（SOH）表征
+	cap := firstNonEmpty(
+		asString(m["Capacitance"]),
+		asString(m["State of Health"]),
+		asString(m["SOH"]),
+		asString(m["Capacity"]),
+		asString(m["Full Charge Capacity"]),
+		asString(m["Battery Capacity"]),
+		asString(rd["Capacity"]),
+		asString(rd["Full Charge Capacity"]),
+		asString(rd["Battery Capacity"]),
+	)
 	if cap != "" {
 		return state + "（" + cap + "）"
 	}
@@ -385,14 +444,52 @@ func collectZFS(c *SSHClient, r *model.HostReport, run func(string) string) {
 		r.ZFSNote = "未安装 ZFS（zpool 命令不存在）"
 		return
 	}
-	rep := &model.ZFSReport{PoolCols: []string{"名称", "大小", "已用", "剩余", "碎片率", "健康状态"}}
-	rep.Pools = parseStorcliLines(run("zpool list -H 2>/dev/null"), 6)
+	// 池：显式指定 -o 列序，避免不同版本 zpool list 默认列数/顺序不同导致表格错位
+	rep := &model.ZFSReport{PoolCols: []string{"名称", "大小", "已用", "剩余", "碎片率", "使用率", "重删", "健康状态"}}
+	rep.Pools = parseStorcliLines(run("zpool list -H -o name,size,alloc,free,frag,cap,dedup,health 2>/dev/null"), 8)
 	rep.Status = run("zpool status -v 2>/dev/null")
-	// 数据集含压缩（算法）/压缩比/重删/重删比
-	rep.DSectCols = []string{"数据集", "已用", "可用", "挂载点", "压缩", "压缩比", "重删", "重删比"}
-	rep.Datasets = parseStorcliLines(run("zfs list -H -o name,used,avail,mountpoint,compression,compressratio,dedup,dedupratio 2>/dev/null"), 8)
+	// 数据集：基础 4 列 + 属性（压缩算法/压缩比/重删/重删比）按名称合并
+	rep.DSectCols = []string{"数据集", "已用", "可用", "挂载点", "压缩算法", "压缩比", "重删", "重删比"}
+	base := parseStorcliLines(run("zfs list -H -o name,used,avail,mountpoint 2>/dev/null"), 4)
+	props := parseStorcliLines(run("zfs get -H -o name,property,value compress,compressratio,dedup,dedupratio 2>/dev/null"), 3)
+	rep.Datasets = mergeZFSDatasets(base, props)
 	if len(rep.Pools) == 0 {
 		r.ZFSNote = "ZFS 已安装但未创建存储池"
 	}
 	r.ZFS = rep
+}
+
+// mergeZFSDatasets 将 zfs get 属性行（名称/属性/值）按数据集名合并进 zfs list 基础行，组成 8 列表。
+// compress 列即压缩算法（off = 未开启；lz4/zstd… = 开启及算法），dedup 列为是否开启重删。
+func mergeZFSDatasets(base, props [][]string) [][]string {
+	byName := map[string]map[string]string{}
+	for _, p := range props {
+		if len(p) < 3 {
+			continue
+		}
+		m, ok := byName[p[0]]
+		if !ok {
+			m = map[string]string{}
+			byName[p[0]] = m
+		}
+		m[p[1]] = strings.TrimSpace(strings.Join(p[2:], "\t"))
+	}
+	var rows [][]string
+	for _, b := range base {
+		if len(b) < 4 {
+			continue
+		}
+		m := byName[b[0]]
+		get := func(k string) string {
+			if m == nil {
+				return ""
+			}
+			return m[k]
+		}
+		rows = append(rows, []string{
+			b[0], b[1], b[2], b[3],
+			get("compress"), get("compressratio"), get("dedup"), get("dedupratio"),
+		})
+	}
+	return rows
 }

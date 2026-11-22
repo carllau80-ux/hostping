@@ -60,6 +60,9 @@ func renderHostReport(h model.SSHHost, r *model.HostReport) string {
 		if strings.TrimSpace(r.Lsscsi) != "" {
 			b.WriteString("<h2>SCSI 设备（lsscsi）</h2><div class='pre-block'>" + html.EscapeString(r.Lsscsi) + "</div>")
 		}
+		// RAID / ZFS（放在 SCSI 设备之后，与存储链路相邻）
+		writeRAIDSection(&b, r)
+		writeZFSSection(&b, r)
 		// df 表格
 		for _, kv := range r.SysInfo {
 			if kv.Key == "__df" {
@@ -114,7 +117,7 @@ func renderHostReport(h model.SSHHost, r *model.HostReport) string {
 			b.WriteString("<div class='na'>未发现 rs_/rsa_ 前缀进程</div>")
 		} else {
 			for _, p := range r.RSProcs {
-				fmt.Fprintf(&b, "<h3>%s (PID %s, 用户 %s)</h3>", html.EscapeString(baseName(p.Cmd)), html.EscapeString(p.PID), html.EscapeString(p.User))
+				fmt.Fprintf(&b, "<h3 style='color:#2563eb'>%s (PID %s, 用户 %s)</h3>", html.EscapeString(baseName(p.Cmd)), html.EscapeString(p.PID), html.EscapeString(p.User))
 				b.WriteString(fmt.Sprintf("<table class='kv'><tr><th>CPU%%</th><td>%s</td></tr><tr><th>内存%%</th><td>%s</td></tr><tr><th>内存(MB)</th><td>%s</td></tr><tr><th>运行时长</th><td>%s</td></tr><tr><th>打开文件数</th><td>%s</td></tr></table>",
 					html.EscapeString(p.CPU), html.EscapeString(p.MEM), html.EscapeString(kbToMB(p.RSS)), html.EscapeString(p.ETime), html.EscapeString(p.FDCount)))
 				if len(p.OpenFiles) > 0 {
@@ -126,89 +129,7 @@ func renderHostReport(h model.SSHHost, r *model.HostReport) string {
 			}
 		}
 
-		// RAID
-		b.WriteString("<h2>RAID 卡（storcli64）</h2>")
-		if r.Storcli != nil && len(r.Storcli.Controllers) > 0 {
-			for _, c := range r.Storcli.Controllers {
-				fmt.Fprintf(&b, "<h3>控制器 %s — %s（状态 %s）</h3>", html.EscapeString(c.Index), html.EscapeString(c.Model), html.EscapeString(orDefaultStr(c.Status, "-")))
-				var ctlBits []string
-				if c.Firmware != "" {
-					ctlBits = append(ctlBits, "固件版本: "+c.Firmware)
-				}
-				if c.Temp != "" {
-					ctlBits = append(ctlBits, "温度: "+c.Temp)
-				}
-				if c.Memory != "" {
-					ctlBits = append(ctlBits, "缓存内存: "+c.Memory)
-				}
-				if c.Battery != "" {
-					ctlBits = append(ctlBits, "电池: "+c.Battery)
-				}
-				if len(ctlBits) > 0 {
-					fmt.Fprintf(&b, "<div class='dim'>%s</div>", html.EscapeString(strings.Join(ctlBits, " · ")))
-				}
-				if len(c.VDs) > 0 {
-					b.WriteString("<div class='dim'>RAID 组（VD）：</div><table><tr><th>VD</th><th>名称</th><th>级别</th><th>状态</th><th>容量</th><th>缓存</th></tr>")
-					for _, v := range c.VDs {
-						fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-							html.EscapeString(v.ID), html.EscapeString(v.Name), html.EscapeString(v.Type), html.EscapeString(v.State), html.EscapeString(v.Size), html.EscapeString(orDefaultStr(v.Cache, "-")))
-					}
-					b.WriteString("</table>")
-				}
-				if len(c.PDs) > 0 {
-					b.WriteString("<div class='dim'>物理磁盘（PD）：</div><table><tr><th>槽位</th><th>型号</th><th>状态</th><th>容量</th><th>SN</th><th>通电时长</th><th>详情</th></tr>")
-					for _, p := range c.PDs {
-						fmt.Fprintf(&b, "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-							html.EscapeString(p.Slot), html.EscapeString(p.Model), html.EscapeString(p.State), html.EscapeString(p.Size),
-							html.EscapeString(orDefaultStr(p.SN, "-")), html.EscapeString(orDefaultStr(p.Power, "-")), html.EscapeString(p.Detail))
-					}
-					b.WriteString("</table>")
-				}
-			}
-		} else {
-			b.WriteString("<div class='na'>" + html.EscapeString(orDefaultStr(r.StorcliNote, "未检测到 RAID 卡")) + "</div>")
-		}
-
-		// ZFS
-		b.WriteString("<h2>ZFS</h2>")
-		if r.ZFS != nil {
-			if len(r.ZFS.Pools) > 0 {
-				b.WriteString("<div class='dim'>存储池：</div><table>")
-				b.WriteString("<tr>")
-				for _, c := range r.ZFS.PoolCols {
-					fmt.Fprintf(&b, "<th>%s</th>", html.EscapeString(c))
-				}
-				b.WriteString("</tr>")
-				for _, row := range r.ZFS.Pools {
-					b.WriteString("<tr>")
-					for _, v := range row {
-						fmt.Fprintf(&b, "<td>%s</td>", html.EscapeString(v))
-					}
-					b.WriteString("</tr>")
-				}
-				b.WriteString("</table>")
-			}
-			if strings.TrimSpace(r.ZFS.Status) != "" {
-				b.WriteString("<div class='dim'>zpool status：</div><div class='pre-block'>" + html.EscapeString(r.ZFS.Status) + "</div>")
-			}
-			if len(r.ZFS.Datasets) > 0 {
-				b.WriteString("<div class='dim'>数据集：</div><table><tr>")
-				for _, c := range r.ZFS.DSectCols {
-					fmt.Fprintf(&b, "<th>%s</th>", html.EscapeString(c))
-				}
-				b.WriteString("</tr>")
-				for _, row := range r.ZFS.Datasets {
-					b.WriteString("<tr>")
-					for _, v := range row {
-						fmt.Fprintf(&b, "<td>%s</td>", html.EscapeString(v))
-					}
-					b.WriteString("</tr>")
-				}
-				b.WriteString("</table>")
-			}
-		} else {
-			b.WriteString("<div class='na'>" + html.EscapeString(orDefaultStr(r.ZFSNote, "未检测到 ZFS")) + "</div>")
-		}
+		// RAID / ZFS 已移至 SCSI 设备之后（writeRAIDSection / writeZFSSection）
 
 		// 警告
 		if len(r.Warnings) > 0 {
@@ -365,5 +286,105 @@ func orDefaultStr(v, def string) string {
 		return def
 	}
 	return v
+}
+
+// writeRAIDSection 渲染 RAID 卡（storcli64）分节（SCSI 设备之后）。
+func writeRAIDSection(b *strings.Builder, r *model.HostReport) {
+	b.WriteString("<h2>RAID 卡（storcli64）</h2>")
+	if r.Storcli != nil && len(r.Storcli.Controllers) > 0 {
+		for _, c := range r.Storcli.Controllers {
+			fmt.Fprintf(b, "<h3>控制器 %s — %s（状态 %s）</h3>", html.EscapeString(c.Index), html.EscapeString(c.Model), html.EscapeString(orDefaultStr(c.Status, "-")))
+			var ctlBits []string
+			if c.CtlStatus != "" {
+				ctlBits = append(ctlBits, "控制器状态: "+c.CtlStatus)
+			}
+			if c.Firmware != "" {
+				ctlBits = append(ctlBits, "固件版本: "+c.Firmware)
+			}
+			if c.Temp != "" {
+				ctlBits = append(ctlBits, "温度: "+c.Temp)
+			}
+			if c.Memory != "" {
+				ctlBits = append(ctlBits, "缓存内存: "+c.Memory)
+			}
+			if c.Battery != "" {
+				ctlBits = append(ctlBits, "电池: "+c.Battery)
+			}
+			if len(ctlBits) > 0 {
+				fmt.Fprintf(b, "<div class='dim'>%s</div>", html.EscapeString(strings.Join(ctlBits, " · ")))
+			}
+			if c.BatteryDetail != "" {
+				fmt.Fprintf(b, "<div class='dim'>电池/CacheVault 详情：%s</div>", html.EscapeString(c.BatteryDetail))
+			}
+			if len(c.VDs) > 0 {
+				b.WriteString("<div class='dim'>RAID 组（VD）：</div><table><tr><th>VD</th><th>名称</th><th>级别</th><th>状态</th><th>容量</th><th>缓存</th><th>条带</th><th>Span 结构</th></tr>")
+				for _, v := range c.VDs {
+					fmt.Fprintf(b, "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+						html.EscapeString(v.ID), html.EscapeString(v.Name), html.EscapeString(v.Type), html.EscapeString(v.State), html.EscapeString(v.Size), html.EscapeString(orDefaultStr(v.Cache, "-")),
+						html.EscapeString(orDefaultStr(v.Strip, "-")), html.EscapeString(orDefaultStr(v.Spans, "-")))
+				}
+				b.WriteString("</table>")
+			}
+			if len(c.PDs) > 0 {
+				b.WriteString("<div class='dim'>物理磁盘（PD）：</div><table><tr><th>槽位</th><th>型号</th><th>状态</th><th>容量</th><th>介质</th><th>接口</th><th>温度</th><th>SN</th><th>通电时长</th><th>详情</th></tr>")
+				for _, p := range c.PDs {
+					fmt.Fprintf(b, "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+						html.EscapeString(p.Slot), html.EscapeString(p.Model), html.EscapeString(p.State), html.EscapeString(p.Size),
+						html.EscapeString(orDefaultStr(p.MediaType, "-")), html.EscapeString(orDefaultStr(p.Interface, "-")), html.EscapeString(orDefaultStr(p.Temp, "-")),
+						html.EscapeString(orDefaultStr(p.SN, "-")), html.EscapeString(orDefaultStr(p.Power, "-")), html.EscapeString(p.Detail))
+				}
+				b.WriteString("</table>")
+			}
+		}
+	} else {
+		b.WriteString("<div class='na'>" + html.EscapeString(orDefaultStr(r.StorcliNote, "未检测到 RAID 卡")) + "</div>")
+	}
+	// storcli 原始输出（完整，诊断用；可折叠）
+	if r.Storcli != nil && strings.TrimSpace(r.Storcli.Raw) != "" {
+		b.WriteString("<details style='margin:8px 0 0'><summary style='cursor:pointer;color:#2563eb;font-size:13px'>storcli 原始输出（完整）</summary><div class='pre-block'>" + html.EscapeString(r.Storcli.Raw) + "</div></details>")
+	}
+}
+
+// writeZFSSection 渲染 ZFS 分节（SCSI 设备之后）。
+func writeZFSSection(b *strings.Builder, r *model.HostReport) {
+	b.WriteString("<h2>ZFS</h2>")
+	if r.ZFS != nil {
+		if len(r.ZFS.Pools) > 0 {
+			b.WriteString("<div class='dim'>存储池：</div><table>")
+			b.WriteString("<tr>")
+			for _, c := range r.ZFS.PoolCols {
+				fmt.Fprintf(b, "<th>%s</th>", html.EscapeString(c))
+			}
+			b.WriteString("</tr>")
+			for _, row := range r.ZFS.Pools {
+				b.WriteString("<tr>")
+				for _, v := range row {
+					fmt.Fprintf(b, "<td>%s</td>", html.EscapeString(v))
+				}
+				b.WriteString("</tr>")
+			}
+			b.WriteString("</table>")
+		}
+		if strings.TrimSpace(r.ZFS.Status) != "" {
+			b.WriteString("<div class='dim'>zpool status：</div><div class='pre-block'>" + html.EscapeString(r.ZFS.Status) + "</div>")
+		}
+		if len(r.ZFS.Datasets) > 0 {
+			b.WriteString("<div class='dim'>数据集：</div><table><tr>")
+			for _, c := range r.ZFS.DSectCols {
+				fmt.Fprintf(b, "<th>%s</th>", html.EscapeString(c))
+			}
+			b.WriteString("</tr>")
+			for _, row := range r.ZFS.Datasets {
+				b.WriteString("<tr>")
+				for _, v := range row {
+					fmt.Fprintf(b, "<td>%s</td>", html.EscapeString(v))
+				}
+				b.WriteString("</tr>")
+			}
+			b.WriteString("</table>")
+		}
+	} else {
+		b.WriteString("<div class='na'>" + html.EscapeString(orDefaultStr(r.ZFSNote, "未检测到 ZFS")) + "</div>")
+	}
 }
 

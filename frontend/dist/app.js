@@ -888,6 +888,31 @@ function hostReportHTML(r) {
   if (r.lsscsi && r.lsscsi !== "") {
     html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("host.lsscsi")}</h2><pre class="sql-input" style="min-height:60px;max-height:200px;overflow:auto">${esc(r.lsscsi)}</pre>`;
   } else if (r.lsscsiNote) html += `<div class="dim" style="font-size:12px;margin:6px 0">${esc(r.lsscsiNote)}</div>`;
+  // RAID / ZFS（放在 SCSI 设备之后，与存储链路相邻）
+  if (r.storcli && (r.storcli.controllers || []).length) {
+    html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("host.secRaid")}</h2>`;
+    for (const c of r.storcli.controllers) {
+      html += `<div class="kv-item" style="margin-bottom:4px"><div class="k">${t("host.controller")} ${esc(c.index)} — ${esc(c.model)}</div><div class="v">${t("host.state")}: ${esc(c.status || "-")}</div></div>`;
+      const ctlBits = [];
+      if (c.ctlStatus) ctlBits.push(`控制器状态: ${esc(c.ctlStatus)}`);
+      if (c.firmware) ctlBits.push(`${t("host.raidFw")}: ${esc(c.firmware)}`);
+      if (c.temp) ctlBits.push(`${t("host.raidTemp")}: ${esc(c.temp)}`);
+      if (c.memory) ctlBits.push(`${t("host.raidMem")}: ${esc(c.memory)}`);
+      if (c.battery) ctlBits.push(`${t("host.raidBattery")}: ${esc(c.battery)}`);
+      if (ctlBits.length) html += `<div class="dim" style="font-size:11.5px;margin:0 0 6px">${ctlBits.join(" · ")}</div>`;
+      if (c.batteryDetail) html += `<div class="dim" style="font-size:11.5px;margin:0 0 6px">电池/CacheVault 详情：${esc(c.batteryDetail)}</div>`;
+      if ((c.vds || []).length) html += simpleTableHTML(["VD", "名称", "级别", "状态", "容量", "缓存", "条带", "Span 结构"], c.vds.map((v) => [v.id, v.name, v.type, v.state, v.size, v.cache || "-", v.strip || "-", v.spans || "-"]));
+      if ((c.pds || []).length) html += simpleTableHTML(["槽位", "型号", "状态", "容量", "介质", "接口", "温度", "SN", "通电时长", "详情"], c.pds.map((p) => [p.slot, p.model, p.state, p.size, p.mediaType || "-", p.interface || "-", p.temp || "-", p.sn || "-", p.power || "-", p.detail]));
+    }
+    if (r.storcliNote) html += `<div class="dim" style="font-size:12px;margin:6px 0">${esc(r.storcliNote)}</div>`;
+    if (r.storcli.raw) html += `<details style="margin:8px 0"><summary style="cursor:pointer;color:var(--brand);font-size:12.5px">storcli 原始输出（完整）</summary><pre class="sql-input" style="min-height:60px;max-height:300px;overflow:auto">${esc(r.storcli.raw)}</pre></details>`;
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.storcliNote || t("host.noRaid"))}</div>`;
+  if (r.zfs && (r.zfs.pools || []).length) {
+    html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("host.secZfs")}</h2>`;
+    html += simpleTableHTML(r.zfs.poolCols || ["名称", "大小", "已用", "剩余", "碎片率", "健康状态"], r.zfs.pools);
+    if (r.zfs.status) html += `<pre class="sql-input" style="min-height:80px;max-height:200px;overflow:auto">${esc(r.zfs.status)}</pre>`;
+    if ((r.zfs.datasets || []).length) html += simpleTableHTML(r.zfs.dsCols || ["数据集", "已用", "可用", "挂载点"], r.zfs.datasets);
+  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.zfsNote || t("host.noZfs"))}</div>`;
   // 磁盘挂载
   for (const kv of r.sysInfo || []) {
     if (kv.key === "__df") html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("host.secDisk")}</h2>` + plainTableHTML(kv.value, ["文件系统", "类型", "容量", "已用", "可用", "已用%", "挂载点"]);
@@ -915,28 +940,7 @@ function hostReportHTML(r) {
     }
     html += `</table>`;
   }
-  // RAID
-  if (r.storcli && (r.storcli.controllers || []).length) {
-    html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("host.secRaid")}</h2>`;
-    for (const c of r.storcli.controllers) {
-      html += `<div class="kv-item" style="margin-bottom:4px"><div class="k">${t("host.controller")} ${esc(c.index)} — ${esc(c.model)}</div><div class="v">${t("host.state")}: ${esc(c.status || "-")}</div></div>`;
-      const ctlBits = [];
-      if (c.firmware) ctlBits.push(`${t("host.raidFw")}: ${esc(c.firmware)}`);
-      if (c.temp) ctlBits.push(`${t("host.raidTemp")}: ${esc(c.temp)}`);
-      if (c.memory) ctlBits.push(`${t("host.raidMem")}: ${esc(c.memory)}`);
-      if (c.battery) ctlBits.push(`${t("host.raidBattery")}: ${esc(c.battery)}`);
-      if (ctlBits.length) html += `<div class="dim" style="font-size:11.5px;margin:0 0 6px">${ctlBits.join(" · ")}</div>`;
-      if ((c.vds || []).length) html += simpleTableHTML(["VD", "名称", "级别", "状态", "容量", "缓存"], c.vds.map((v) => [v.id, v.name, v.type, v.state, v.size, v.cache || "-"]));
-      if ((c.pds || []).length) html += simpleTableHTML(["槽位", "型号", "状态", "容量", "SN", "通电时长", "详情"], c.pds.map((p) => [p.slot, p.model, p.state, p.size, p.sn || "-", p.power || "-", p.detail]));
-    }
-  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.storcliNote || t("host.noRaid"))}</div>`;
-  // ZFS
-  if (r.zfs && (r.zfs.pools || []).length) {
-    html += `<h2 style="color:var(--brand);font-size:14px;margin:14px 0 6px">${t("host.secZfs")}</h2>`;
-    html += simpleTableHTML(r.zfs.poolCols || ["名称", "大小", "已用", "剩余", "碎片率", "健康状态"], r.zfs.pools);
-    if (r.zfs.status) html += `<pre class="sql-input" style="min-height:80px;max-height:200px;overflow:auto">${esc(r.zfs.status)}</pre>`;
-    if ((r.zfs.datasets || []).length) html += simpleTableHTML(r.zfs.dsCols || ["数据集", "已用", "可用", "挂载点"], r.zfs.datasets);
-  } else html += `<div class="empty" style="padding:8px;font-size:12px">${esc(r.zfsNote || t("host.noZfs"))}</div>`;
+  // RAID / ZFS 已移至 SCSI 设备之后
   // 安全状态（左右布局）——放在 Top 进程之前
   html += `<h2 style="color:var(--brand);font-size:15px;margin:16px 0 8px">${t("host.secSecurity")}</h2>`;
   html += `<table class="data host-lr">`;
@@ -956,7 +960,7 @@ function hostReportHTML(r) {
   if (!(r.rsProcs || []).length) html += `<div class="empty">${t("host.noRS")}</div>`;
   for (const p of r.rsProcs || []) {
     html += `<div class="kv-item" style="margin-bottom:8px">
-      <div class="k">${esc(p.cmd)} <span class="dim">(PID ${esc(p.pid)} · ${esc(p.user)})</span></div>
+      <div class="k" style="color:var(--brand)">${esc(p.cmd)} <span class="dim">(PID ${esc(p.pid)} · ${esc(p.user)})</span></div>
       <div class="v">CPU ${esc(p.cpu)}% · MEM ${esc(p.mem)}% · 内存 ${esc(kbToMB(p.rss))} · 运行 ${esc(p.etime)} · FD ${esc(p.fdCount)}</div>
       ${fmtOpenFiles(p.openFiles)}
       ${fmtConns(p.conns)}

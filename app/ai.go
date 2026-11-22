@@ -379,14 +379,17 @@ func hostReportDigest(r *model.HostReport) string {
 	}
 	if r.Storcli != nil {
 		for _, c := range r.Storcli.Controllers {
-			w("\n## RAID 控制器 %s（%s，状态 %s）\n", c.Index, c.Model, c.Status)
-			w("- 固件：%s · 温度：%s · 缓存内存：%s · 电池：%s\n", orAI(c.Firmware), orAI(c.Temp), orAI(c.Memory), orAI(c.Battery))
-			for _, v := range c.VDs {
-				w("- VD %s 名称=%s 级别=%s 状态=%s 容量=%s 缓存=%s\n", v.ID, v.Name, v.Type, v.State, v.Size, v.Cache)
-			}
-			for _, p := range c.PDs {
-				w("- PD %s 型号=%s 状态=%s 容量=%s SN=%s 通电=%s小时 %s\n", p.Slot, p.Model, p.State, p.Size, p.SN, p.Power, p.Detail)
-			}
+		w("\n## RAID 控制器 %s（%s，状态 %s）\n", c.Index, c.Model, c.Status)
+		w("- 命令状态：%s · 控制器状态：%s · 固件：%s · 温度：%s · 缓存内存：%s · 电池：%s\n", orAI(c.Status), orAI(c.CtlStatus), orAI(c.Firmware), orAI(c.Temp), orAI(c.Memory), orAI(c.Battery))
+		if c.BatteryDetail != "" {
+			w("- 电池/CacheVault 详情：%s\n", c.BatteryDetail)
+		}
+		for _, v := range c.VDs {
+			w("- VD %s 名称=%s 级别=%s 状态=%s 容量=%s 缓存=%s 条带=%s Span=%s\n", v.ID, v.Name, v.Type, v.State, v.Size, v.Cache, v.Strip, v.Spans)
+		}
+		for _, p := range c.PDs {
+			w("- PD %s 型号=%s 状态=%s 容量=%s 介质=%s 接口=%s 温度=%s SN=%s 通电=%s小时 %s\n", p.Slot, p.Model, p.State, p.Size, p.MediaType, p.Interface, p.Temp, p.SN, p.Power, p.Detail)
+		}
 		}
 	} else if r.StorcliNote != "" {
 		w("\n## RAID\n- %s\n", r.StorcliNote)

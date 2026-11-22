@@ -81,36 +81,44 @@ type StorcliVD struct {
 	State  string `json:"state"`
 	Size   string `json:"size"`
 	Cache  string `json:"cache"`  // 缓存模式（RWBD / RA / WB 等）
+	Strip  string `json:"strip"`  // 条带大小（如 128 KB）
+	Spans  string `json:"spans"`  // Span 数 × 每 Span 盘数（如 1 × 4）
 	Detail string `json:"detail"`
 }
 
 // StorcliPD storcli 物理磁盘条目。
 type StorcliPD struct {
-	Slot   string `json:"slot"`
-	Model  string `json:"model"`
-	State  string `json:"state"`
-	Size   string `json:"size"`
-	SN     string `json:"sn"`    // 序列号
-	Power  string `json:"power"` // 通电时长
-	Detail string `json:"detail"`
+	Slot      string `json:"slot"`
+	Model     string `json:"model"`
+	State     string `json:"state"`
+	Size      string `json:"size"`
+	SN        string `json:"sn"`        // 序列号
+	Power     string `json:"power"`     // 通电时长
+	MediaType string `json:"mediaType"` // 介质类型（HDD / SSD）
+	Interface string `json:"interface"` // 接口类型（SAS / SATA）
+	Temp      string `json:"temp"`      // 盘温度
+	Detail    string `json:"detail"`
 }
 
 // StorcliCtl 一个 RAID 控制器。
 type StorcliCtl struct {
-	Index    string      `json:"index"`
-	Model    string      `json:"model"`
-	Status   string      `json:"status"`
-	Firmware string      `json:"firmware"` // 固件版本
-	Temp     string      `json:"temp"`     // 控制器温度
-	Memory   string      `json:"memory"`   // 缓存内存
-	Battery  string      `json:"battery"`  // 电池状态
-	VDs      []StorcliVD `json:"vds"`
-	PDs      []StorcliPD `json:"pds"`
+	Index         string      `json:"index"`
+	Model         string      `json:"model"`
+	Status        string      `json:"status"`        // 命令状态（storcli Command Status）
+	CtlStatus     string      `json:"ctlStatus"`     // 控制器状态（Optimal / Degraded / Offline）
+	Firmware      string      `json:"firmware"`      // 固件版本
+	Temp          string      `json:"temp"`          // 控制器温度
+	Memory        string      `json:"memory"`        // 缓存内存
+	Battery       string      `json:"battery"`       // 电池/CacheVault 状态摘要
+	BatteryDetail string      `json:"batteryDetail"` // 电池/CacheVault 详情（类型、容量、电压、温度、健康度等）
+	VDs           []StorcliVD `json:"vds"`
+	PDs           []StorcliPD `json:"pds"`
 }
 
 // StorcliReport storcli64 巡检结果。
 type StorcliReport struct {
 	Controllers []StorcliCtl `json:"controllers"`
+	Raw         string       `json:"raw,omitempty"` // storcli 各命令完整原始输出（诊断用，命令行分隔）
 }
 
 // ZFSReport ZFS 巡检结果。
